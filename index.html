@@ -440,44 +440,66 @@ function delARow(rowId,rId){const e=document.getElementById(rowId);if(e)e.remove
 
 async function consultarTarifas(rId){
   const rb=document.getElementById('rb-'+rId);
-  const ruta=rb.querySelector('.resp-ruta').value||rb.querySelector('.resp-mun').value;
+  const ruta=(rb.querySelector('.resp-ruta').value||rb.querySelector('.resp-mun').value||'').trim();
   const reg=rb.querySelector('.resp-reg').value;
-  if(!ruta){setSt('st-tar-'+rId,'Ingresa la ruta o municipio destino primero.','err');return}
-  setSt('st-tar-'+rId,'<span class="spin"></span> Consultando tarifa para '+ruta+'...','info');
+  if(!ruta){setSt('st-tar-'+rId,'Ingresa la ruta o municipio destino primero.','err');return;}
+  setSt('st-tar-'+rId,'<span class="spin"></span> Consultando tarifa '+reg+' → '+ruta+'...','info');
   try{
-    const HDRS={'Content-Type':'application/json'};
-    const SYS='Eres experto en transporte intermunicipal colombiano. Busca la tarifa real actual y responde SOLO con un objeto JSON válido sin texto adicional ni backticks: {"tarifa_ida":numero,"tarifa_ida_vuelta":numero,"fuente":"string","notas":"string"}. Usa solo números enteros en COP.';
-    const MSG=[{role:'user',content:`Cuánto cuesta el pasaje de bus intermunicipal desde ${reg} hasta ${ruta} Colombia? Tarifa ida y vuelta en pesos COP 2025.`}];
-    const BODY={model:'claude-sonnet-4-20250514',max_tokens:1000,tools:[{type:'web_search_20250305',name:'web_search'}],system:SYS,messages:MSG};
-    let r1=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:HDRS,body:JSON.stringify(BODY)});
-    let d1=await r1.json();
-    if(d1.error) throw new Error(d1.error.message||JSON.stringify(d1.error));
-    let finalContent=d1.content||[];
-    if(d1.stop_reason==='tool_use'){
-      const msgs2=[...MSG,{role:'assistant',content:d1.content}];
-      const toolResults=d1.content.filter(b=>b.type==='tool_use').map(b=>({type:'tool_result',tool_use_id:b.id,content:Array.isArray(b.content)?b.content:[{type:'text',text:JSON.stringify(b.content||'')}]}));
-      msgs2.push({role:'user',content:toolResults});
-      let r2=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:HDRS,body:JSON.stringify({...BODY,messages:msgs2})});
-      let d2=await r2.json();
-      if(d2.error) throw new Error(d2.error.message||JSON.stringify(d2.error));
-      finalContent=d2.content||[];
+    const H={'Content-Type':'application/json'};
+    // Step 1: search-enabled call — may return tool_use blocks
+    let msgs=[{role:'user',content:'¿Cuánto cuesta el pasaje de bus intermunicipal de '+reg+' a '+ruta+', Colombia? Dame el precio exacto en pesos COP 2025, solo ida.'}];
+    let body={model:'claude-sonnet-4-20250514',max_tokens:1500,tools:[{type:'web_search_20250305',name:'web_search'}],messages:msgs};
+    let res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:H,body:JSON.stringify(body)});
+    let data=await res.json();
+    if(data.error) throw new Error(data.error.message);
+    // Step 2: keep looping while stop_reason is tool_use (handles multiple search rounds)
+    let rounds=0;
+    while(data.stop_reason==='tool_use' && rounds<4){
+      rounds++;
+      msgs=[...msgs,{role:'assistant',content:data.content}];
+      const results=data.content
+        .filter(b=>b.type==='tool_use')
+        .map(b=>({
+          type:'tool_result',
+          tool_use_id:b.id,
+          content: b.content
+            ? (Array.isArray(b.content)?b.content:[{type:'text',text:JSON.stringify(b.content)}])
+            : [{type:'text',text:'No results found'}]
+        }));
+      msgs.push({role:'user',content:results});
+      res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:H,body:JSON.stringify({...body,messages:msgs})});
+      data=await res.json();
+      if(data.error) throw new Error(data.error.message);
     }
-    let txt=(finalContent.filter(b=>b.type==='text').map(b=>b.text).join('')).trim();
-    const m=txt.match(/\{[\s\S]*?"tarifa_ida"[\s\S]*?\}/)||txt.match(/\{[\s\S]*?\}/);
-    if(!m) throw new Error('Sin JSON en respuesta');
-    const tar=JSON.parse(m[0]);
-    const val=Math.round(tar.tarifa_ida||(tar.tarifa_ida_vuelta/2)||0);
-    if(!val) throw new Error('Tarifa 0');
+    // Step 3: extract final text
+    const texto=(data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join(' ');
+    if(!texto) throw new Error('Respuesta vacía del modelo');
+    // Step 4: ask model to extract just the number from its own response
+    const ext=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:H,body:JSON.stringify({
+      model:'claude-sonnet-4-20250514',max_tokens:100,
+      system:'Extrae el precio en COP del texto. Responde ÚNICAMENTE con un número entero, sin puntos ni comas ni símbolos. Si no hay precio claro escribe 0.',
+      messages:[{role:'user',content:texto.slice(0,2000)}]
+    })});
+    const extData=await ext.json();
+    if(extData.error) throw new Error(extData.error.message);
+    const numStr=((extData.content||[]).find(b=>b.type==='text')?.text||'0').replace(/[^0-9]/g,'');
+    const val=parseInt(numStr,10)||0;
+    if(!val||val<1000||val>500000) throw new Error('Tarifa fuera de rango ('+val+'). Ingresa manualmente.');
+    // Step 5: apply to form
     const tb=document.getElementById('tb-'+rId);let updated=false;
     tb.querySelectorAll('tr').forEach(tr=>{
-      if(updated)return;const sel=tr.querySelector('select');
-      if(sel&&sel.value==='TRANSPORTE INTERMUNICIPAL'){const ns=tr.querySelectorAll('input[type=number]');if(ns[2]){ns[2].value=val;rcRow(tr.id,rId);updated=true;}}
+      if(updated)return;
+      const sel=tr.querySelector('select');
+      if(sel&&sel.value==='TRANSPORTE INTERMUNICIPAL'){
+        const ns=tr.querySelectorAll('input[type=number]');
+        if(ns[2]){ns[2].value=val;rcRow(tr.id,rId);updated=true;}
+      }
     });
-    if(!updated)addARow(rId,{concepto:'TRANSPORTE INTERMUNICIPAL',desc:'Transporte '+reg+' - '+ruta+' ida y regreso',tray:2,pers:1,val});
-    setSt('st-tar-'+rId,'&#10003; $'+val.toLocaleString('es-CO')+' COP/trayecto'+(tar.fuente?' — '+tar.fuente:''),'ok');
+    if(!updated) addARow(rId,{concepto:'TRANSPORTE INTERMUNICIPAL',desc:'Transporte '+reg+' - '+ruta+' ida y regreso',tray:2,pers:1,val});
+    setSt('st-tar-'+rId,'&#10003; $'+val.toLocaleString('es-CO')+' COP por trayecto — verifica antes de enviar.','ok');
   }catch(e){
-    console.error('Tarifas error:',e);
-    setSt('st-tar-'+rId,'No se pudo obtener tarifa ('+e.message.slice(0,100)+'). Ingresa manualmente.','err');
+    console.error('Tarifas:',e);
+    setSt('st-tar-'+rId,'No se pudo obtener tarifa: '+e.message.slice(0,120)+'. Ingresa el valor manualmente.','err');
   }
 }
 
