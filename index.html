@@ -279,6 +279,34 @@ td.sub{font-size:12px;font-weight:600;text-align:right;padding:6px 8px;white-spa
           <button class="aib" style="color:#c00;border-color:#f0aaaa" onclick="clearHistorial()">&#128465; Limpiar</button>
         </div>
       </div>
+      <!-- Filtros historial -->
+      <div id="hist-filters" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid #f0eff0">
+        <div class="f" style="flex:1;min-width:160px;max-width:220px">
+          <label>Centro de costos</label>
+          <input id="hf-cc" placeholder="Ej: CC8934-01" oninput="renderHistorial()" style="padding:7px 10px;font-size:13px;border:1px solid #ddd;border-radius:6px;background:#fafafa;width:100%">
+        </div>
+        <div class="f" style="flex:1;min-width:140px;max-width:200px">
+          <label>Municipio</label>
+          <input id="hf-mun" placeholder="Municipio" oninput="renderHistorial()" style="padding:7px 10px;font-size:13px;border:1px solid #ddd;border-radius:6px;background:#fafafa;width:100%">
+        </div>
+        <div class="f" style="flex:1;min-width:140px;max-width:200px">
+          <label>Usuario</label>
+          <input id="hf-usr" placeholder="Nombre o cédula" oninput="renderHistorial()" style="padding:7px 10px;font-size:13px;border:1px solid #ddd;border-radius:6px;background:#fafafa;width:100%">
+        </div>
+        <div class="f" style="flex:0 0 130px">
+          <label>Fecha desde</label>
+          <input id="hf-desde" type="date" oninput="renderHistorial()" style="padding:7px 10px;font-size:13px;border:1px solid #ddd;border-radius:6px;background:#fafafa;width:100%">
+        </div>
+        <div class="f" style="flex:0 0 130px">
+          <label>Fecha hasta</label>
+          <input id="hf-hasta" type="date" oninput="renderHistorial()" style="padding:7px 10px;font-size:13px;border:1px solid #ddd;border-radius:6px;background:#fafafa;width:100%">
+        </div>
+        <div class="f" style="flex:0 0 auto;justify-content:flex-end;padding-top:16px">
+          <button onclick="limpiarFiltrosHistorial()" style="padding:7px 14px;border:1px solid #ddd;border-radius:6px;background:#fff;color:#888;font-size:12px;cursor:pointer;white-space:nowrap">&#215; Limpiar filtros</button>
+        </div>
+      </div>
+      <div id="hist-count" style="font-size:11px;color:#aaa;margin-bottom:8px"></div>
+
       <div id="hist-empty" style="text-align:center;padding:40px;color:#bbb;font-size:13px">
         Aún no hay solicitudes. Genera un anticipo para que aparezca aquí.
       </div>
@@ -1257,10 +1285,50 @@ function addToHistorial(estData, resps){
 function renderHistorial(){
   const tbody = document.getElementById('hist-body');
   const empty = document.getElementById('hist-empty');
-  const wrap = document.getElementById('hist-table-wrap');
+  const wrap  = document.getElementById('hist-table-wrap');
+  const count = document.getElementById('hist-count');
+
+  // Read filters
+  const fCC   = (document.getElementById('hf-cc')?.value||'').trim().toLowerCase();
+  const fMun  = normMun(document.getElementById('hf-mun')?.value||'');
+  const fUsr  = (document.getElementById('hf-usr')?.value||'').trim().toLowerCase();
+  const fDesde= document.getElementById('hf-desde')?.value||'';
+  const fHasta= document.getElementById('hf-hasta')?.value||'';
+
+  // Parse date from historial entry "DD/MM/YYYY HH:MM" -> compare with YYYY-MM-DD filter
+  function parseHDate(fechaGen){
+    // fechaGen = "19/05/2026 14:32" or "19/05/2026 14:32 ✎"
+    const m = (fechaGen||'').match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+    return m ? `${m[3]}-${m[2]}-${m[1]}` : '';
+  }
+
+  const filtered = historial.filter(h=>{
+    if(fCC  && !(h.cc||'').toLowerCase().includes(fCC)) return false;
+    if(fMun && !normMun(h.municipio||'').includes(fMun)) return false;
+    if(fUsr && !(h.usuario||'').toLowerCase().includes(fUsr) && !(h.nombre||'').toLowerCase().includes(fUsr) && !(h.cedula||'').includes(fUsr)) return false;
+    if(fDesde||fHasta){
+      const hDate = parseHDate(h.fechaGen);
+      if(fDesde && hDate < fDesde) return false;
+      if(fHasta && hDate > fHasta) return false;
+    }
+    return true;
+  });
+
+  const hasFilters = fCC||fMun||fUsr||fDesde||fHasta;
+  if(count) count.textContent = historial.length
+    ? (hasFilters ? `${filtered.length} de ${historial.length} solicitudes` : `${historial.length} solicitudes en total`)
+    : '';
+
   if(!historial.length){ empty.style.display='block'; wrap.style.display='none'; return; }
-  empty.style.display='none'; wrap.style.display='block';
-  tbody.innerHTML = historial.map((h,i)=>{
+  empty.style.display = filtered.length?'none':'block';
+  if(!filtered.length){
+    empty.textContent = 'Sin resultados con los filtros aplicados.';
+    wrap.style.display='none';
+    return;
+  }
+  empty.textContent = 'Aún no hay solicitudes. Genera un anticipo para que aparezca aquí.';
+  wrap.style.display='block';
+  tbody.innerHTML = filtered.map((h,i)=>{
     const conceptos = h.filas.map(f=>`<span class="htag">${f.concepto.replace('TRANSPORTE ','TRSP. ')}</span>`).join('');
     const aloj = h.tieneAloj
       ? h.rutas.map(r=>`<span class="htag" style="background:#e8f0ff;color:#1a50dd">${r.municipio||r.depto} ${r.noches}n</span>`).join('')
@@ -2477,6 +2545,13 @@ function buildMunData(items, year, filterCC){
     const pct = totalPresup>0?(g.ejecutado/totalPresup*100):0;
     return {...g, presupuesto:totalPresup, pct, estado:pct>100?'over':pct>80?'warn':'ok'};
   });
+}
+
+function limpiarFiltrosHistorial(){
+  ['hf-cc','hf-mun','hf-usr','hf-desde','hf-hasta'].forEach(id=>{
+    const el=document.getElementById(id);if(el)el.value='';
+  });
+  renderHistorial();
 }
 </script>
 
