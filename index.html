@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Generador CNC — Anticipos &amp; Alojamiento</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f0eff0;color:#1a1a1a;font-size:14px}
@@ -112,6 +113,38 @@ td.sub{font-size:12px;font-weight:600;text-align:right;padding:6px 8px;white-spa
 .cc-mun-table td.num{text-align:right;font-variant-numeric:tabular-nums}
 .cc-mun-table td.over{color:#c00;font-weight:600}
 .cc-mun-table td.ok{color:#0a5c30}
+.rpt-card{background:#fff;border:1px solid #e4e3e4;border-radius:10px;padding:18px 20px;margin-bottom:14px}
+.rpt-kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+.kpi{background:#fafaf8;border:1px solid #e8e7e0;border-radius:10px;padding:14px 16px}
+.kpi-label{font-size:11px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
+.kpi-val{font-size:22px;font-weight:700;color:#1a1a1a}
+.kpi-sub{font-size:11px;color:#aaa;margin-top:3px}
+.rpt-filter{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:16px}
+.rpt-filter .f{flex:0 0 160px}
+.rbt{width:100%;border-collapse:collapse;font-size:12px}
+.rbt th{font-size:10px;font-weight:600;color:#888;text-align:left;padding:6px 10px;border-bottom:2px solid #f0eff0;white-space:nowrap;cursor:pointer;user-select:none}
+.rbt th:hover{color:#1a1a1a}
+.rbt td{padding:7px 10px;border-bottom:1px solid #f8f7f5;vertical-align:middle}
+.rbt tr:hover td{background:#fafaf8}
+.prog-wrap{display:flex;align-items:center;gap:8px;min-width:160px}
+.prog-track{flex:1;height:8px;background:#f0eff0;border-radius:4px;overflow:hidden;min-width:80px}
+.prog-fill{height:100%;border-radius:4px;transition:width .4s}
+.prog-fill.ok{background:#4caf50}.prog-fill.warn{background:#ff9800}.prog-fill.over{background:#f44336}
+.prog-pct{font-size:11px;font-weight:600;min-width:36px;text-align:right}
+.prog-pct.ok{color:#0a5c30}.prog-pct.warn{color:#b05000}.prog-pct.over{color:#c00}
+.badge-over{display:inline-block;font-size:10px;padding:2px 7px;border-radius:4px;background:#fde8e8;color:#c00;font-weight:600;margin-left:4px}
+.badge-ok{display:inline-block;font-size:10px;padding:2px 7px;border-radius:4px;background:#e6f9ef;color:#0a5c30;font-weight:600;margin-left:4px}
+.rpt-section-title{font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.07em;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #f0eff0;display:flex;align-items:center;justify-content:space-between}
+.rpt-empty{text-align:center;padding:40px;color:#bbb;font-size:13px}
+.sel-wrap{position:relative;width:100%}
+.sel-wrap input{width:100%;padding:7px 28px 7px 10px;font-size:13px;border:1px solid #ddd;border-radius:6px;background:#fafafa;color:#1a1a1a;cursor:pointer}
+.sel-wrap input:focus{outline:none;border-color:#1a1a1a;background:#fff}
+.sel-arrow{position:absolute;right:9px;top:50%;transform:translateY(-50%);pointer-events:none;color:#aaa;font-size:10px}
+.sel-dd{position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #ddd;border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.12);z-index:300;max-height:200px;overflow-y:auto;display:none;margin-top:2px}
+.sel-dd.open{display:block}
+.sel-opt{padding:8px 12px;cursor:pointer;font-size:13px;color:#1a1a1a;border-bottom:1px solid #f5f5f5}
+.sel-opt:last-child{border:none}
+.sel-opt:hover{background:#f0eff0}
 .drop-zone{border:2px dashed #ddd;border-radius:10px;padding:32px;text-align:center;cursor:pointer;transition:all .2s;background:#fafaf8}
 .drop-zone:hover,.drop-zone.drag-over{border-color:#1a1a1a;background:#f5f4f0}
 .drop-zone p{font-size:13px;color:#888;margin-top:8px}
@@ -152,6 +185,7 @@ td.sub{font-size:12px;font-weight:600;text-align:right;padding:6px 8px;white-spa
     <div class="tab" onclick="switchTab('l')">Solo alojamiento</div>
     <div class="tab" onclick="switchTab('h')">&#128203; Historial</div>
     <div class="tab" onclick="switchTab('p')">&#128196; Presupuestos</div>
+    <div class="tab" onclick="switchTab('r')">&#128202; Reportes</div>
   </div>
 
   <div id="pa" class="panel active">
@@ -273,6 +307,84 @@ td.sub{font-size:12px;font-weight:600;text-align:right;padding:6px 8px;white-spa
       </div>
     </div>
   </div>
+  <!-- PANEL REPORTES -->
+  <div id="pr" class="panel">
+
+    <!-- Filters -->
+    <div class="rpt-card">
+      <div class="rpt-section-title">
+        <span>Filtros</span>
+        <button onclick="renderReportes()" style="padding:5px 14px;background:#1a1a1a;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer">&#8635; Actualizar</button>
+      </div>
+      <div class="rpt-filter">
+        <div class="f" style="flex:0 0 180px"><label>Centro de costos</label>
+          <select id="rpt-cc" onchange="renderReportes()">
+            <option value="">Todos los CC</option>
+          </select>
+        </div>
+        <div class="f" style="flex:0 0 140px"><label>Año presupuesto</label>
+          <select id="rpt-year" onchange="renderReportes()">
+            <option value="2026">2026</option>
+            <option value="2025">2025</option>
+          </select>
+        </div>
+        <div class="f" style="flex:0 0 180px"><label>Regional</label>
+          <select id="rpt-regional" onchange="renderReportes()">
+            <option value="">Todas las regionales</option>
+            <option>MEDELLIN</option><option>BOGOTA</option><option>CALI</option>
+            <option>BARRANQUILLA</option><option>BUCARAMANGA</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- KPIs -->
+    <div id="rpt-kpis" class="rpt-kpi"></div>
+
+    <!-- By rubro -->
+    <div class="rpt-card">
+      <div class="rpt-section-title"><span>Ejecución por rubro</span></div>
+      <div id="rpt-rubros"></div>
+    </div>
+
+    <!-- By municipio -->
+    <div class="rpt-card">
+      <div class="rpt-section-title">
+        <span>Ejecución por municipio</span>
+        <span id="rpt-over-badge" style="font-size:11px;color:#c00;font-weight:600"></span>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="rbt" id="rpt-mun-table">
+          <thead><tr>
+            <th onclick="sortRpt('municipio')">Municipio ↕</th>
+            <th onclick="sortRpt('cc')">CC ↕</th>
+            <th onclick="sortRpt('ejecutado')">Ejecutado ↕</th>
+            <th onclick="sortRpt('presupuesto')">Presupuesto ↕</th>
+            <th onclick="sortRpt('pct')">% Ejecución ↕</th>
+            <th>Detalle por rubro</th>
+            <th onclick="sortRpt('estado')">Estado ↕</th>
+          </tr></thead>
+          <tbody id="rpt-mun-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- By responsable -->
+    <div class="rpt-card">
+      <div class="rpt-section-title"><span>Anticipos por responsable</span></div>
+      <div style="overflow-x:auto">
+        <table class="rbt">
+          <thead><tr>
+            <th>Responsable</th><th>Cédula</th><th>CC</th>
+            <th>Municipio</th><th>Regional</th>
+            <th>Total anticipo</th><th>Conceptos</th><th>Fecha</th>
+          </tr></thead>
+          <tbody id="rpt-resp-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
   <!-- PANEL PRESUPUESTOS -->
   <div id="pp" class="panel">
 
@@ -325,11 +437,13 @@ const STD={ALIMENTACION:38000,'TRANSPORTE URBANO':3800,'TRANSPORTE RURAL':20000}
 let rid=0,cid=0,respId=0,aRowId=0;
 
 function switchTab(t){
-  document.querySelectorAll('.tab').forEach((e,i)=>e.classList.toggle('active',(i===0&&t==='a')||(i===1&&t==='l')||(i===2&&t==='h')||(i===3&&t==='p')));
+  document.querySelectorAll('.tab').forEach((e,i)=>e.classList.toggle('active',(i===0&&t==='a')||(i===1&&t==='l')||(i===2&&t==='h')||(i===3&&t==='p')||(i===4&&t==='r')));
   document.getElementById('pa').classList.toggle('active',t==='a');
   document.getElementById('pl').classList.toggle('active',t==='l');
   document.getElementById('ph').classList.toggle('active',t==='h');
   document.getElementById('pp').classList.toggle('active',t==='p');
+  document.getElementById('pr').classList.toggle('active',t==='r');
+  if(t==='r') renderReportes();
 }
 function norm(s){return(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/,' ').trim()}
 function gv(id){return document.getElementById(id)?.value||'';}
@@ -735,381 +849,337 @@ function getAllResps(){
 }
 
 // ============================================================
-//  EXCEL BUILD - cell-level borders matching the original
+//  EXCEL GENERATION — ExcelJS (proper fonts, borders, fills)
 // ============================================================
-const TH={style:'thin',color:{rgb:'000000'}};
-const NO={style:null};
-function brd(t,b,l,r){return{top:t?TH:NO,bottom:b?TH:NO,left:l?TH:NO,right:r?TH:NO};}
-function mkC(v,opts={}){
-  const c={v:(v===null||v===undefined)?'':v, t:typeof v==='number'?'n':'s'};
-  const s={};
-  s.font={name:opts.font||'Arial',sz:opts.sz||10};
-  if(opts.bold)s.font.bold=true;
-  s.alignment={vertical:'center'};
-  if(opts.h)s.alignment.horizontal=opts.h;
-  if(opts.wrap)s.alignment.wrapText=true;
-  if(opts.fill)s.fill={patternType:'solid',fgColor:{rgb:opts.fill}};
-  if(opts.numFmt)s.numFmt=opts.numFmt;
-  // Border: default thin all sides, can override with opts.brd=[t,b,l,r] booleans
-  const br=opts.brd!==undefined?opts.brd:[1,1,1,1];
-  s.border=brd(br[0],br[1],br[2],br[3]);
-  c.s=s;return c;
-}
-function fml(f,opts={}){
-  const c={f,t:'n'};
-  const s={};
-  s.font={name:opts.font||'Arial',sz:opts.sz||10};if(opts.bold)s.font.bold=true;
-  s.alignment={vertical:'center'};if(opts.h)s.alignment.horizontal=opts.h;
-  if(opts.fill)s.fill={patternType:'solid',fgColor:{rgb:opts.fill}};
-  if(opts.numFmt)s.numFmt=opts.numFmt;
-  const br=opts.brd!==undefined?opts.brd:[1,1,1,1];
-  s.border=brd(br[0],br[1],br[2],br[3]);
-  c.s=s;return c;
-}
-function mg(merges,r1,c1,r2,c2){merges.push({s:{r:r1,c:c1},e:{r:r2,c:c2}});}
 
-function writeAnticipo(ws, merges, estData, resp, bi, N){
-  const o=bi*36; // row offset (0-based)
-  const R=r=>String(o+r+1); // 1-indexed row string
-  const A=(col,r)=>col+R(r);
+const THIN = {style:'thin', color:{argb:'FF000000'}};
+const NO_B = {style:null};
+function brd(t=true,b=true,l=true,r=true){
+  return {
+    top:    t?THIN:NO_B, bottom: b?THIN:NO_B,
+    left:   l?THIN:NO_B, right:  r?THIN:NO_B
+  };
+}
+function arial(sz=10,bold=false){ return {name:'Arial',size:sz,bold}; }
+function arialN(sz=10,bold=false){ return {name:'Arial Narrow',size:sz,bold}; }
+function tahoma(sz=11,bold=false){ return {name:'Tahoma',size:sz,bold}; }
+function whiteFill(){ return {type:'pattern',pattern:'solid',fgColor:{argb:'FFFFFFFF'}}; }
+function centerAlign(wrapText=false){ return {horizontal:'center',vertical:'middle',wrapText}; }
+function vcenterAlign(horizontal=null,wrapText=false){ return {horizontal,vertical:'middle',wrapText}; }
 
-  // === LOGO AREA A1:D4 — bordered rectangle with image ===
-  // Row 0: top border on A-D, content area E1:H4 merged, right side I,J
-  ws[A('A',0)]=mkC('',{brd:[1,0,1,0]});  ws[A('B',0)]=mkC('',{brd:[1,0,0,0]});
-  ws[A('C',0)]=mkC('',{brd:[1,0,0,0]});  ws[A('D',0)]=mkC('',{brd:[1,0,0,1]});
-  // Add logo image to this block
-  if(!ws['!images']) ws['!images']=[];
-  // Logo is injected via JSZip post-processing in writeXlsxWithLogo()
-  ws[A('F',0)]=mkC('',{brd:[0,0,0,0]});  ws[A('G',0)]=mkC('',{brd:[0,0,0,0]});  ws[A('H',0)]=mkC('',{brd:[0,0,0,1]});
-  // Row 1,2: left and right borders only on logo
-  ws[A('A',1)]=mkC('',{brd:[0,0,1,0]});  ws[A('D',1)]=mkC('',{brd:[0,0,0,1]});
-  ws[A('E',1)]=mkC('',{brd:[0,0,1,0]});  ws[A('H',1)]=mkC('',{brd:[0,0,0,1]});
-  ws[A('A',2)]=mkC('',{brd:[0,0,1,0]});  ws[A('D',2)]=mkC('',{brd:[0,0,0,1]});
-  ws[A('E',2)]=mkC('',{brd:[0,0,1,0]});  ws[A('H',2)]=mkC('',{brd:[0,0,0,1]});
-  // Row 3: bottom border on A-D
-  ws[A('A',3)]=mkC('',{brd:[0,1,1,0]});  ws[A('B',3)]=mkC('',{brd:[0,1,0,0]});
-  ws[A('C',3)]=mkC('',{brd:[0,1,0,0]});  ws[A('D',3)]=mkC('',{brd:[0,1,0,1]});
-  ws[A('E',3)]=mkC('',{brd:[0,1,1,0]});  ws[A('F',3)]=mkC('',{brd:[0,1,0,0]});
-  ws[A('G',3)]=mkC('',{brd:[0,1,0,0]});  ws[A('H',3)]=mkC('',{brd:[0,1,0,1]});
+function sc(ws, addr, val, opts={}){
+  const c = ws.getCell(addr);
+  if(val !== undefined && val !== null) c.value = val;
+  if(opts.font)   c.font      = opts.font;
+  if(opts.fill)   c.fill      = opts.fill;
+  if(opts.align)  c.alignment = opts.align;
+  if(opts.border) c.border    = opts.border;
+  if(opts.numFmt) c.numFmt    = opts.numFmt;
+  return c;
+}
+
+function mg(ws, topLeft, bottomRight){
+  ws.mergeCells(`${topLeft}:${bottomRight}`);
+}
+
+const BLOCK = 36;
+
+function writeBlock(ws, estData, resp, bi, N, logoImgId){
+  const o = bi * BLOCK; // row offset (0-based)
+  const R = r => o + r + 1; // 1-indexed Excel row
+
+  // Row heights
+  const heights = {0:15,1:15,2:15,3:15,4:15,5:24.75,6:15,7:24.75,8:15,
+                   9:14.25,10:15,11:21.75,12:12.75,13:25.5,14:16.5,
+                   15:25.5,16:14.25,17:38.25,18:28.5};
+  Object.entries(heights).forEach(([ri,h])=>{ ws.getRow(R(+ri)).height=h; });
+
+  // Logo area borders A1:D4
+  for(let r=0;r<4;r++){
+    for(let col=1;col<=4;col++){
+      const c=ws.getCell(R(r),col);
+      c.border={
+        top:    r===0?THIN:NO_B, bottom: r===3?THIN:NO_B,
+        left:   col===1?THIN:NO_B, right: col===4?THIN:NO_B
+      };
+    }
+  }
+
+  // Logo image
+  if(logoImgId !== null && logoImgId !== undefined){
+    ws.addImage(logoImgId, {
+      tl:{col:1.1, row:o+0.2},
+      br:{col:2.85, row:o+3.85},
+      editAs:'oneCell'
+    });
+  }
 
   // Title E1:H4
-  mg(merges,o+0,4,o+3,7);
-  ws[A('E',0)]=mkC('SOLICITUD DE ANTICIPOS',{font:'Arial',sz:14,bold:true,h:'center',wrap:true,fill:'FFFFFF'});
+  mg(ws,`E${R(0)}`,`H${R(3)}`);
+  sc(ws,`E${R(0)}`,'SOLICITUD DE ANTICIPOS',
+     {font:arial(14,true),fill:whiteFill(),align:centerAlign(true),border:brd()});
 
-  // I1,I2: Código/Versión — individual cells
-  ws[A('I',0)]=mkC(' Código:  ',{font:'Arial Narrow',sz:10,bold:true,wrap:true,fill:'FFFFFF'});
-  ws[A('J',0)]=mkC('',{fill:'FFFFFF'});
-  ws[A('I',1)]=mkC(' Versión:',{font:'Arial Narrow',sz:10,bold:true,wrap:true,fill:'FFFFFF'});
-  ws[A('J',1)]=mkC('',{fill:'FFFFFF'});
-  // I3:I4 merged, J3:J4 merged
-  mg(merges,o+2,8,o+3,8);
-  ws[A('I',2)]=mkC(' No. Anticipos:',{font:'Arial Narrow',sz:10,bold:true,h:'center',wrap:true,fill:'FFFFFF'});
-  mg(merges,o+2,9,o+3,9);
-  ws[A('J',2)]=mkC(`${bi+1} de ${N}`,{font:'Arial Narrow',sz:20,bold:true,h:'center',fill:'FFFFFF'});
+  // No. Anticipos I1:J4
+  sc(ws,`I${R(0)}`,' Código:  ',   {font:arialN(10,true),fill:whiteFill(),align:vcenterAlign(null,true),border:brd()});
+  sc(ws,`J${R(0)}`,'',             {fill:whiteFill(),border:brd()});
+  sc(ws,`I${R(1)}`,' Versión:',    {font:arialN(10,true),fill:whiteFill(),align:vcenterAlign(null,true),border:brd()});
+  sc(ws,`J${R(1)}`,'',             {fill:whiteFill(),border:brd()});
+  mg(ws,`I${R(2)}`,`I${R(3)}`);
+  sc(ws,`I${R(2)}`,' No. Anticipos:',{font:arialN(10,true),fill:whiteFill(),align:centerAlign(true),border:brd()});
+  mg(ws,`J${R(2)}`,`J${R(3)}`);
+  sc(ws,`J${R(2)}`,`${bi+1} de ${N}`,{font:arialN(20,true),fill:whiteFill(),align:centerAlign(),border:brd()});
 
-  // === ROW 6 — CC / Estudio / Fecha ===
-  ws[A('A',5)]=mkC('Centro de Costos',{sz:10,h:'center',wrap:true,fill:'FFFFFF'});
-  mg(merges,o+5,1,o+5,2);
-  ws[A('B',5)]=mkC(estData.cc,{sz:10,h:'center',fill:'FFFFFF'});
-  ws[A('C',5)]=mkC('',{brd:[1,1,0,1],fill:'FFFFFF'});
-  ws[A('D',5)]=mkC('Nombre del Estudio',{sz:10,h:'center',fill:'FFFFFF'});
-  mg(merges,o+5,4,o+5,6);
-  ws[A('E',5)]=mkC(estData.estudio,{sz:10,h:'left',wrap:true,fill:'FFFFFF'});
-  ws[A('F',5)]=mkC('',{brd:[1,1,0,0],fill:'FFFFFF'});
-  ws[A('G',5)]=mkC('',{brd:[1,1,0,1],fill:'FFFFFF'});
-  ws[A('H',5)]=mkC('Fecha de Solicitud',{sz:10,bold:true,h:'center',fill:'FFFFFF'});
-  ws[A('I',5)]=mkC(fmtDate(estData.fecha),{sz:10,fill:'FFFFFF',brd:[1,1,1,0]});
-  ws[A('J',5)]=mkC('',{brd:[1,1,0,1],fill:'FFFFFF'});
+  const fd = estData.fecha||'';
+  const fdStr = fd ? fd.split('-').reverse().join('/') : '';
 
-  // === ROW 8 — Director Proyecto / Director Campo / Coordinador ===
-  ws[A('A',7)]=mkC('Director de Proyecto',{sz:10,h:'center',wrap:true,fill:'FFFFFF'});
-  mg(merges,o+7,1,o+7,2);
-  ws[A('B',7)]=mkC(estData.dir_proy||'',{sz:10,h:'center',fill:'FFFFFF'});
-  ws[A('C',7)]=mkC('',{brd:[1,1,0,1],fill:'FFFFFF'});
-  ws[A('D',7)]=mkC('Director de Campo',{sz:10,h:'center',fill:'FFFFFF'});
-  mg(merges,o+7,4,o+7,6);
-  ws[A('E',7)]=mkC(estData.dir_campo||'',{sz:10,fill:'FFFFFF'});
-  ws[A('F',7)]=mkC('',{brd:[1,1,0,0],fill:'FFFFFF'});
-  ws[A('G',7)]=mkC('',{brd:[1,1,0,1],fill:'FFFFFF'});
-  ws[A('H',7)]=mkC('Coordinador de Campo',{sz:10,h:'center',fill:'FFFFFF'});
-  mg(merges,o+7,8,o+7,9);
-  ws[A('I',7)]=mkC(estData.coord_campo||'',{sz:10,fill:'FFFFFF',brd:[1,1,1,0]});
-  ws[A('J',7)]=mkC('',{brd:[1,1,0,1],fill:'FFFFFF'});
+  // Row 6: CC / Estudio / Fecha
+  sc(ws,`A${R(5)}`,'Centro de Costos',{font:arial(10),fill:whiteFill(),align:centerAlign(true),border:brd(false,false,false,false)});
+  mg(ws,`B${R(5)}`,`C${R(5)}`);
+  sc(ws,`B${R(5)}`,estData.cc||'',{font:arial(10),fill:whiteFill(),align:centerAlign(),border:brd()});
+  sc(ws,`D${R(5)}`,'Nombre del Estudio',{font:arial(10),fill:whiteFill(),align:centerAlign(true),border:brd(false,false,false,false)});
+  mg(ws,`E${R(5)}`,`G${R(5)}`);
+  sc(ws,`E${R(5)}`,estData.estudio||'',{font:arial(10),fill:whiteFill(),align:vcenterAlign('left',true),border:brd()});
+  sc(ws,`H${R(5)}`,'Fecha de Solicitud',{font:arial(10,true),fill:whiteFill(),align:centerAlign(true),border:brd(false,false,false,false)});
+  sc(ws,`I${R(5)}`,fdStr,{font:arial(10),fill:whiteFill(),align:vcenterAlign(),border:brd(true,true,true,false)});
+  sc(ws,`J${R(5)}`,'',{fill:whiteFill(),border:brd(true,true,false,true)});
 
-  // === ROW 10 — Regional / Depto / Municipio ===
-  ws[A('A',9)]=mkC('Regional',{sz:11,h:'right',fill:'FFFFFF'});
-  mg(merges,o+9,1,o+9,2);
-  ws[A('B',9)]=mkC(resp.regional,{sz:10,h:'center',fill:'FFFFFF'});
-  ws[A('C',9)]=mkC('',{brd:[1,1,0,1],fill:'FFFFFF'});
-  ws[A('D',9)]=mkC('Departamento',{sz:10,h:'right',wrap:true,fill:'FFFFFF'});
-  mg(merges,o+9,4,o+9,6);
-  ws[A('E',9)]=mkC(resp.depto,{sz:10,fill:'FFFFFF',brd:[1,1,1,0]});
-  ws[A('F',9)]=mkC('',{brd:[1,1,0,0],fill:'FFFFFF'});
-  ws[A('G',9)]=mkC('',{brd:[1,1,0,1],fill:'FFFFFF'});
-  ws[A('H',9)]=mkC('Municipio',{sz:10,h:'center',fill:'FFFFFF'});
-  mg(merges,o+9,8,o+9,9);
-  ws[A('I',9)]=mkC(resp.municipio,{sz:10,fill:'FFFFFF',brd:[1,1,1,0]});
-  ws[A('J',9)]=mkC('',{brd:[1,1,0,1],fill:'FFFFFF'});
+  // Row 8: Director Proyecto / Director Campo / Coordinador
+  sc(ws,`A${R(7)}`,'Director de Proyecto',{font:arial(10),fill:whiteFill(),align:centerAlign(true),border:brd(false,false,false,false)});
+  mg(ws,`B${R(7)}`,`C${R(7)}`);
+  sc(ws,`B${R(7)}`,estData.dir_proy||'',{font:arial(10),fill:whiteFill(),align:centerAlign(),border:brd()});
+  sc(ws,`D${R(7)}`,'Director de Campo',{font:arial(10),fill:whiteFill(),align:centerAlign(true),border:brd(false,false,false,false)});
+  mg(ws,`E${R(7)}`,`G${R(7)}`);
+  sc(ws,`E${R(7)}`,estData.dir_campo||'',{font:arial(10),fill:whiteFill(),align:vcenterAlign(),border:brd()});
+  sc(ws,`H${R(7)}`,'Coordinador de Campo',{font:arial(10),fill:whiteFill(),align:centerAlign(true),border:brd(false,false,false,false)});
+  mg(ws,`I${R(7)}`,`J${R(7)}`);
+  sc(ws,`I${R(7)}`,estData.coord_campo||'',{font:arial(10),fill:whiteFill(),align:vcenterAlign(),border:brd(true,true,true,false)});
 
-  // === ROW 12 — Tipo / Responsable / Cedula ===
-  ws[A('A',11)]=mkC('Tipo de Solicitud',{sz:10,h:'center',wrap:true,fill:'FFFFFF'});
-  mg(merges,o+11,1,o+11,2);
-  ws[A('B',11)]=mkC('INICIAL',{sz:10,h:'center',wrap:true,fill:'FFFFFF'});
-  ws[A('C',11)]=mkC('',{brd:[1,1,0,1],fill:'FFFFFF'});
-  ws[A('D',11)]=mkC('Responsable',{sz:10,h:'right',wrap:true,fill:'FFFFFF'});
-  mg(merges,o+11,4,o+11,6);
-  ws[A('E',11)]=mkC(resp.nombre,{sz:10,h:'left',wrap:true,fill:'FFFFFF'});
-  ws[A('F',11)]=mkC('',{brd:[1,1,0,0],fill:'FFFFFF'});
-  ws[A('G',11)]=mkC('',{brd:[1,1,0,1],fill:'FFFFFF'});
-  ws[A('H',11)]=mkC('No. Cedula',{sz:10,h:'center',fill:'FFFFFF'});
-  // Cedula spans I12:J12 — original shows J12 has the value
-  mg(merges,o+11,8,o+11,9);
-  ws[A('I',11)]=mkC(resp.cedula,{sz:10,h:'center'});
+  // Row 10: Regional / Depto / Municipio
+  sc(ws,`A${R(9)}`,'Regional',{font:{name:'Arial',size:11},fill:whiteFill(),align:vcenterAlign('right'),border:brd(false,false,false,false)});
+  mg(ws,`B${R(9)}`,`C${R(9)}`);
+  sc(ws,`B${R(9)}`,resp.regional||'',{font:arial(10),fill:whiteFill(),align:centerAlign(),border:brd()});
+  sc(ws,`D${R(9)}`,'Departamento',{font:arial(10),fill:whiteFill(),align:vcenterAlign('right',true),border:brd(false,false,false,false)});
+  mg(ws,`E${R(9)}`,`G${R(9)}`);
+  sc(ws,`E${R(9)}`,resp.depto||'',{font:arial(10),fill:whiteFill(),align:vcenterAlign(),border:brd(true,true,true,false)});
+  sc(ws,`H${R(9)}`,'Municipio',{font:arial(10),fill:whiteFill(),align:centerAlign(true),border:brd(false,false,false,false)});
+  mg(ws,`I${R(9)}`,`J${R(9)}`);
+  sc(ws,`I${R(9)}`,resp.municipio||'',{font:arial(10),fill:whiteFill(),align:vcenterAlign(),border:brd(true,true,true,false)});
 
-  // === ROW 14 — Celular / Medio / Ruta / Fecha giro ===
-  ws[A('A',13)]=mkC('Celular',{sz:10,h:'center',fill:'FFFFFF'});
-  mg(merges,o+13,1,o+13,2);
-  ws[A('B',13)]=mkC(resp.celular,{sz:10,h:'center'});
-  ws[A('C',13)]=mkC('',{brd:[1,1,0,1]});
-  ws[A('D',13)]=mkC('Medio de Envio',{sz:10,h:'center',fill:'FFFFFF'});
-  mg(merges,o+13,4,o+13,5);
-  ws[A('E',13)]=mkC(resp.medio,{sz:10,h:'center',wrap:true,fill:'FFFFFF'});
-  ws[A('F',13)]=mkC('',{brd:[1,1,0,1],fill:'FFFFFF'});
-  ws[A('G',13)]=mkC('Ruta',{sz:10,h:'right',wrap:true,fill:'FFFFFF'});
-  ws[A('H',13)]=mkC(resp.ruta,{sz:10,bold:true,h:'center'});
-  ws[A('I',13)]=mkC('Fecha de envio del giro',{sz:10,bold:true,h:'center',wrap:true,fill:'FFFFFF',brd:[0,0,1,0]});
-  ws[A('J',13)]=mkC(fmtDate(resp.fecha_giro||estData.fecha),{sz:10,fill:'FFFFFF'});
+  // Row 12: Tipo / Responsable / Cedula
+  sc(ws,`A${R(11)}`,'Tipo de Solicitud',{font:arial(10),fill:whiteFill(),align:centerAlign(true),border:brd(false,false,false,false)});
+  mg(ws,`B${R(11)}`,`C${R(11)}`);
+  sc(ws,`B${R(11)}`,'INICIAL',{font:arial(10),fill:whiteFill(),align:centerAlign(true),border:brd()});
+  sc(ws,`D${R(11)}`,'Responsable',{font:arial(10),fill:whiteFill(),align:vcenterAlign('right',true),border:brd(false,false,false,false)});
+  mg(ws,`E${R(11)}`,`G${R(11)}`);
+  sc(ws,`E${R(11)}`,resp.nombre||'',{font:arial(10),fill:whiteFill(),align:vcenterAlign('left',true),border:brd()});
+  sc(ws,`H${R(11)}`,'No. Cedula',{font:arial(10),fill:whiteFill(),align:centerAlign(true),border:brd(false,false,false,false)});
+  mg(ws,`I${R(11)}`,`J${R(11)}`);
+  sc(ws,`I${R(11)}`,resp.cedula||'',{font:arial(10),align:centerAlign(),border:brd()});
 
-  // === ROW 16 — Tipo cuenta / Entidad / Num cuenta ===
-  ws[A('D',15)]=mkC('Tipo cuenta *',{sz:10,h:'center',wrap:true,fill:'FFFFFF'});
-  mg(merges,o+15,4,o+15,5);
-  ws[A('E',15)]=mkC('',{fill:'FFFFFF'});
-  ws[A('F',15)]=mkC('',{brd:[1,1,0,1],fill:'FFFFFF'});
-  ws[A('G',15)]=mkC('Entidad Bancaria*',{sz:10,h:'right',wrap:true,fill:'FFFFFF'});
-  ws[A('H',15)]=mkC('',{fill:'FFFFFF'});
-  mg(merges,o+15,8,o+15,9);
-  ws[A('I',15)]=mkC('Numero cuenta*',{sz:10,bold:true,h:'center',fill:'FFFFFF'});
+  // Row 14: Celular / Medio / Ruta / Fecha giro
+  const fgStr = (resp.fecha_giro||fd||'').split('-').reverse().join('/');
+  sc(ws,`A${R(13)}`,'Celular',{font:arial(10),fill:whiteFill(),align:centerAlign(true),border:brd(false,false,false,false)});
+  mg(ws,`B${R(13)}`,`C${R(13)}`);
+  sc(ws,`B${R(13)}`,resp.celular||'',{font:arial(10),align:centerAlign(),border:brd()});
+  sc(ws,`D${R(13)}`,'Medio de Envio',{font:arial(10),fill:whiteFill(),align:centerAlign(true),border:brd(false,false,false,false)});
+  mg(ws,`E${R(13)}`,`F${R(13)}`);
+  sc(ws,`E${R(13)}`,resp.medio||'',{font:arial(10),fill:whiteFill(),align:centerAlign(true),border:brd()});
+  sc(ws,`G${R(13)}`,'Ruta',{font:arial(10),fill:whiteFill(),align:vcenterAlign('right',true),border:brd(false,false,false,false)});
+  sc(ws,`H${R(13)}`,resp.ruta||'',{font:arial(10,true),align:centerAlign(true),border:brd()});
+  sc(ws,`I${R(13)}`,'Fecha de envio del giro',{font:arial(10,true),fill:whiteFill(),align:centerAlign(true),border:brd(false,false,true,false)});
+  sc(ws,`J${R(13)}`,fgStr,{font:arial(10),fill:whiteFill(),align:vcenterAlign(),border:brd()});
 
-  // Row 17: note (bottom border A-D)
-  ws[A('A',16)]=mkC('* Solo para solicitudes por Transferencia electrónica',{sz:10,brd:[0,1,0,0]});
-  ws[A('B',16)]=mkC('',{brd:[0,1,0,0]});ws[A('C',16)]=mkC('',{brd:[0,1,0,0]});ws[A('D',16)]=mkC('',{brd:[0,1,0,0]});
+  // Row 16: Transferencia
+  sc(ws,`D${R(15)}`,'Tipo cuenta *',{font:arial(10),fill:whiteFill(),align:centerAlign(true),border:brd(false,false,false,false)});
+  mg(ws,`E${R(15)}`,`F${R(15)}`);
+  sc(ws,`E${R(15)}`,'',{fill:whiteFill(),border:brd()});
+  sc(ws,`G${R(15)}`,'Entidad Bancaria*',{font:arial(10),fill:whiteFill(),align:vcenterAlign('right',true),border:brd(false,false,false,false)});
+  sc(ws,`H${R(15)}`,'',{fill:whiteFill(),border:brd()});
+  mg(ws,`I${R(15)}`,`J${R(15)}`);
+  sc(ws,`I${R(15)}`,'Numero cuenta*',{font:arial(10,true),fill:whiteFill(),align:centerAlign(true),border:brd()});
+  sc(ws,`A${R(16)}`,'* Solo para solicitudes por Transferencia electrónica',{font:arial(10),align:vcenterAlign(),border:brd(false,true,false,false)});
 
-  // === ROW 18 — Table headers ===
-  ws[A('A',17)]=mkC('Ciudad Ejecución',{sz:10,bold:true,h:'center',wrap:true,fill:'FFFFFF',brd:[0,1,1,1]});
-  mg(merges,o+17,1,o+17,3);
-  ws[A('B',17)]=mkC('Concepto de Legalización',{sz:10,bold:true,h:'center',wrap:true,fill:'FFFFFF'});
-  ws[A('C',17)]=mkC('',{brd:[1,1,0,0],fill:'FFFFFF'});ws[A('D',17)]=mkC('',{brd:[1,1,0,1],fill:'FFFFFF'});
-  ws[A('E',17)]=mkC('Dias / Trayectos / Cantidad',{sz:10,bold:true,h:'center',wrap:true,fill:'FFFFFF'});
-  ws[A('F',17)]=mkC('Personas',{sz:10,bold:true,h:'center',wrap:true,fill:'FFFFFF',brd:[1,1,1,0]});
-  ws[A('G',17)]=mkC('Valor unitario',{sz:10,bold:true,h:'center',wrap:true,fill:'FFFFFF',brd:[1,1,1,0]});
-  mg(merges,o+17,7,o+17,8);
-  ws[A('H',17)]=mkC('Descripcion',{sz:10,bold:true,h:'center',wrap:true,fill:'FFFFFF'});
-  ws[A('I',17)]=mkC('',{brd:[1,1,0,1],fill:'FFFFFF'});
-  ws[A('J',17)]=mkC('Valor Por Rubros',{sz:10,bold:true,h:'center',wrap:true,fill:'FFFFFF'});
+  // Row 18: Table headers
+  mg(ws,`B${R(17)}`,`D${R(17)}`);
+  mg(ws,`H${R(17)}`,`I${R(17)}`);
+  [['A','Ciudad Ejecución',[false,true,true,true]],
+   ['B','Concepto de Legalización',[true,true,true,true]],
+   ['E','Dias / Trayectos / Cantidad',[true,true,true,true]],
+   ['F','Personas',[true,true,true,false]],
+   ['G','Valor unitario',[true,true,true,false]],
+   ['H','Descripcion',[true,true,true,true]],
+   ['J','Valor Por Rubros',[true,true,true,true]]
+  ].forEach(([col,val,b])=>{
+    sc(ws,`${col}${R(17)}`,val,{font:arial(10,true),fill:whiteFill(),align:centerAlign(true),border:brd(...b)});
+  });
 
-  // === DATA ROWS 19-31 (13 rows) ===
+  // Data rows 19-31 (13 rows)
   const SR=18, MAX=13;
+  const filas=resp.filas||[];
   for(let i=0;i<MAX;i++){
-    const r=SR+i, er=o+r+1;
-    mg(merges,o+r,1,o+r,3); mg(merges,o+r,7,o+r,8);
-    const f=resp.filas[i]||{};const has=i<resp.filas.length;
-    ws['A'+er]=mkC(has?f.ciudad:'',{sz:10,wrap:true});
-    ws['B'+er]=mkC(has?f.concepto:'',{sz:10,h:'center',fill:'FFFFFF',brd:[1,1,1,0]});
-    ws['C'+er]=mkC('',{brd:[1,1,0,0],fill:'FFFFFF'});ws['D'+er]=mkC('',{brd:[1,1,0,1],fill:'FFFFFF'});
-    // For empty rows: write 0 but format as blank so zeros don't show
-    const efmt = has ? '#,##0' : ';;;';
-    ws['E'+er]=mkC(has?(f.trayectos||0):0,{sz:10,h:'center',fill:'FFFFFF',numFmt:efmt});
-    ws['F'+er]=mkC(has?(f.personas||0):0,{sz:10,h:'center',fill:'FFFFFF',brd:[1,1,1,0],numFmt:efmt});
-    ws['G'+er]=mkC(has?(f.valor_unit||0):0,{sz:10,h:'right',fill:'FFFFFF',numFmt:has?'#,##0':';;;',brd:[1,1,1,0]});
-    ws['H'+er]=mkC(has?f.descripcion:'',{sz:10,h:'center',wrap:true,fill:'FFFFFF',brd:[1,1,1,0]});
-    ws['I'+er]=mkC('',{brd:[1,1,0,1],fill:'FFFFFF'});
-    ws['J'+er]=fml(`IFERROR(E${er}*F${er}*G${er},0)`,{sz:10,h:'right',fill:'FFFFFF',numFmt:has?'#,##0':';;;'});
+    const r=SR+i, er=R(r);
+    mg(ws,`B${er}`,`D${er}`);
+    mg(ws,`H${er}`,`I${er}`);
+    const has=i<filas.length;
+    const f=has?filas[i]:{};
+    const tray=has?(f.trayectos||0):0;
+    const pers=has?(f.personas||0):0;
+    const val= has?(f.valor_unit||0):0;
+    const subtotal=tray*pers*val;
+    const nf=has?'#,##0':';;;';
+    sc(ws,`A${er}`,has?(f.ciudad||''):'',{font:arial(10),align:vcenterAlign(null,true),border:brd()});
+    sc(ws,`B${er}`,has?(f.concepto||''):'',{font:arial(10),fill:whiteFill(),align:centerAlign(true),border:brd(true,true,true,false)});
+    sc(ws,`E${er}`,tray,{font:arial(10),fill:whiteFill(),align:centerAlign(),border:brd(),numFmt:nf});
+    sc(ws,`F${er}`,pers,{font:arial(10),fill:whiteFill(),align:centerAlign(),border:brd(true,true,true,false),numFmt:nf});
+    sc(ws,`G${er}`,val,{font:arial(10),fill:whiteFill(),align:vcenterAlign('right'),border:brd(true,true,true,false),numFmt:nf});
+    sc(ws,`H${er}`,has?(f.descripcion||''):'',{font:arial(10),fill:whiteFill(),align:centerAlign(true),border:brd(true,true,true,false)});
+    sc(ws,`J${er}`,subtotal,{font:arial(10),fill:whiteFill(),align:vcenterAlign('right'),border:brd(),numFmt:nf});
   }
 
-  // === TOTAL ROW (row 32) ===
-  const totR=o+SR+MAX, totER=totR+1;
-  ws['A'+totER]=mkC('',{brd:[0,0,1,0]});ws['B'+totER]=mkC('',{brd:[0,0,1,0]});
-  mg(merges,totR,7,totR,8);
-  ws['H'+totER]=mkC('TOTAL ANTICIPO',{sz:10,bold:true,h:'center',fill:'FFFFFF'});
-  ws['I'+totER]=mkC('',{brd:[1,1,0,1],fill:'FFFFFF'});
-  ws['J'+totER]=fml(`SUM(J${o+SR+1}:J${o+SR+MAX})`,{sz:10,bold:true,h:'right',fill:'FFFFFF',numFmt:'#,##0'});
+  // Total row
+  const totR=R(SR+MAX);
+  ws.getRow(totR).height=20;
+  mg(ws,`H${totR}`,`I${totR}`);
+  const totalVal=filas.reduce((s,f)=>s+(f.trayectos||0)*(f.personas||0)*(f.valor_unit||0),0);
+  sc(ws,`H${totR}`,'TOTAL ANTICIPO',{font:arial(10,true),fill:whiteFill(),align:centerAlign(true),border:brd()});
+  sc(ws,`J${totR}`,totalVal,{font:arial(10,true),fill:whiteFill(),align:vcenterAlign('right'),border:brd(),numFmt:'#,##0'});
 
-  // === ESTADO ROW (row 33) ===
-  const estR=totR+1, estER=estR+1;
-  ws['A'+estER]=mkC('',{brd:[0,0,1,0]});ws['B'+estER]=mkC('',{brd:[0,0,1,0]});
-  ws['B'+estER]=mkC('Estado',{sz:10,bold:true,h:'right',wrap:true,fill:'FFFFFF',brd:[0,0,1,0]});
-  ws['C'+estER]=mkC('',{fill:'FFFFFF'});
-  ws['G'+estER]=mkC('Observación',{sz:9,bold:true,h:'right',fill:'FFFFFF',brd:[0,0,0,0]});
-  ws['H'+estER]=mkC('',{fill:'FFFFFF'});
-  ws['I'+estER]=mkC('',{brd:[0,1,0,0]});ws['J'+estER]=mkC('',{brd:[1,1,0,1],fill:'FFFFFF'});
+  // Estado row
+  const estR=totR+1;
+  sc(ws,`B${estR}`,'Estado',{font:arial(10,true),fill:whiteFill(),align:vcenterAlign('right'),border:brd(false,false,true,false)});
+  sc(ws,`G${estR}`,'Observación',{font:arial(9,true),fill:whiteFill(),align:vcenterAlign()});
+  sc(ws,`J${estR}`,'',{fill:whiteFill(),border:brd(true,true,false,true)});
 
-  // === RESUMEN ROW (row 35) — use actual values, not cell references ===
-  const resR=totR+3, resER=resR+1;
-  ws['A'+resER]=mkC('',{brd:[0,0,1,1]});ws['B'+resER]=mkC('',{brd:[0,0,1,0]});
-  ws['B'+resER]=mkC('RESUMEN',{sz:9,bold:true,h:'center',wrap:true,fill:'FFFFFF',brd:[0,0,1,0]});
-  // Total value
-  const totalVal=resp.filas.reduce((s,f)=>s+(f.trayectos||0)*(f.personas||0)*(f.valor_unit||0),0);
-  ws['C'+resER]=mkC(Math.round(totalVal),{sz:10,bold:true,h:'center',fill:'FFFFFF',numFmt:'#,##0',brd:[1,1,1,0]});
-  ws['D'+resER]=mkC(resp.nombre,{sz:10,bold:true,h:'center',wrap:true,fill:'FFFFFF',brd:[1,1,1,0]});
-  ws['E'+resER]=mkC(resp.cedula,{sz:10,bold:true,h:'center',fill:'FFFFFF',brd:[1,1,1,0]});
-  ws['F'+resER]=mkC(resp.celular,{sz:10,bold:true,h:'center',wrap:true,fill:'FFFFFF',brd:[1,1,1,0]});
-  ws['G'+resER]=mkC(resp.medio,{sz:10,bold:true,h:'center',wrap:true,fill:'FFFFFF'});
-  ws['H'+resER]=mkC('',{fill:'FFFFFF'});ws['I'+resER]=mkC('',{fill:'FFFFFF'});ws['J'+resER]=mkC('',{fill:'FFFFFF'});
+  // Resumen row
+  const resR=totR+3;
+  sc(ws,`B${resR}`,'RESUMEN',{font:arial(9,true),fill:whiteFill(),align:centerAlign(true),border:brd(false,false,true,false)});
+  sc(ws,`C${resR}`,totalVal,{font:arial(10,true),fill:whiteFill(),align:centerAlign(),border:brd(),numFmt:'#,##0'});
+  sc(ws,`D${resR}`,resp.nombre||'',{font:arial(10,true),fill:whiteFill(),align:centerAlign(true),border:brd()});
+  sc(ws,`E${resR}`,resp.cedula||'',{font:arial(10,true),fill:whiteFill(),align:centerAlign(),border:brd()});
+  sc(ws,`F${resR}`,resp.celular||'',{font:arial(10,true),fill:whiteFill(),align:centerAlign(true),border:brd()});
+  sc(ws,`G${resR}`,resp.medio||'',{font:arial(10,true),fill:whiteFill(),align:centerAlign(true),border:brd()});
 
-  // Row 36: bottom border + note
-  const noteR=totR+4, noteER=noteR+1;
-  ws['A'+noteER]=mkC('',{brd:[0,1,1,0]});ws['B'+noteER]=mkC('',{brd:[0,1,1,0]});
-  ws['C'+noteER]=mkC('',{brd:[0,1,0,0]});ws['D'+noteER]=mkC('',{brd:[0,1,0,0]});
-  ws['E'+noteER]=mkC('',{brd:[1,1,0,0]});ws['F'+noteER]=mkC('',{brd:[0,1,0,0]});
-  ws['G'+noteER]=mkC('',{brd:[0,1,0,0]});
-  ws['H'+noteER]=mkC('* Solo para solicitudes por Transferencia electrónica',{sz:10,fill:'FFFFFF',brd:[0,1,0,0]});
-  ws['I'+noteER]=mkC('',{brd:[0,1,0,0]});ws['J'+noteER]=mkC('',{brd:[0,1,0,0]});
+  // Bottom border
+  const botR=totR+4;
+  for(let col=1;col<=10;col++) ws.getCell(botR,col).border={bottom:THIN};
 }
 
-function buildAnticipoWb(estData,resps){
-  const N=resps.length, BLOCK=36;
-  const wb={SheetNames:['Presupuesto'],Sheets:{}};
-  const ws={}, merges=[];
+async function buildAnticipoWb(estData, resps){
+  const wb = new ExcelJS.Workbook();
+  wb.creator='CNC';
+  wb.created=new Date();
+  const ws = wb.addWorksheet('Presupuesto');
 
-  ws['!cols']=[{wch:16.3},{wch:12.9},{wch:12},{wch:21.1},{wch:13},{wch:13.9},{wch:11.9},{wch:20.3},{wch:21.6},{wch:14.9}];
-  const allRows=[];
-  for(let i=0;i<N*BLOCK+4;i++)allRows.push({hpt:12.75});
-  resps.forEach((_,bi)=>{
-    const o=bi*BLOCK;
-    [15,15,15,15,15,24.75,15,24.75,15,14.25,15,21.75,12.75,25.5,16.5,25.5,14.25,38.25,28.5].forEach((h,i)=>allRows[o+i]={hpt:h});
+  // Column widths A-J
+  [16.3,12.9,12,21.1,13,13.9,11.9,20.3,21.6,14.9].forEach((w,i)=>{
+    ws.getColumn(i+1).width=w;
   });
-  ws['!rows']=allRows;
 
-  resps.forEach((resp,bi)=>writeAnticipo(ws,merges,estData,resp,bi,N));
-
-  ws['!merges']=merges;
-  ws['!ref']=XLSX.utils.encode_range({s:{r:0,c:0},e:{r:N*BLOCK+2,c:9}});
-  wb.Sheets['Presupuesto']=ws;
-
-  // ALOJAMIENTO sheets
-  const respsConAloj=resps.filter(r=>r.tieneAloj&&r.rutas.length>0);
-  if(respsConAloj.length>0){
-    const wsA={},mA=[];
-    function scA(addr,v,opts){wsA[addr]=mkC(v,opts);}
-    wsA['!cols']=[{wch:8.4},{wch:19.9},{wch:24.7},{wch:19.3},{wch:26.9},{wch:16.1},{wch:20.1},{wch:16.1},{wch:14}];
-    const fa=respsConAloj[0];
-    mg(mA,0,0,5,4);scA('A1','',{border:false});
-    mg(mA,0,5,4,8);scA('F1','SOLICITUD DE ALOJAMIENTO',{font:'Tahoma',sz:18,bold:true,h:'center',wrap:true});
-    mg(mA,5,5,5,8);scA('F6','Versión: 2023',{font:'Tahoma',sz:11,h:'left'});
-    mg(mA,6,0,6,8);scA('A7','');
-    mg(mA,7,0,7,1);scA('A8','NOMBRE DEL ESTUDIO',{font:'Tahoma',sz:11,bold:true,h:'center'});
-    mg(mA,7,2,7,4);scA('C8',estData.estudio,{sz:10,h:'center',fill:'FFFFFF'});
-    mg(mA,7,5,7,8);scA('F8','FECHA DE SOLICITUD',{font:'Tahoma',sz:11,bold:true,h:'center'});
-    mg(mA,8,0,8,1);scA('A9','CENTRO DE COSTOS',{font:'Tahoma',sz:11,bold:true,h:'center'});
-    mg(mA,8,2,8,4);scA('C9',estData.cc,{sz:10,h:'center',fill:'FFFFFF'});
-    mg(mA,8,5,8,8);scA('F9',fmtDate(estData.fecha),{font:'Tahoma',sz:11,h:'center'});
-    mg(mA,9,0,9,8);scA('A10','');
-    mg(mA,10,0,10,1);scA('A11','NOMBRE DEL SOLICITANTE',{font:'Tahoma',sz:11,bold:true,h:'center'});
-    mg(mA,10,2,10,4);scA('C11',estData.coord_campo||fa.nombre,{font:'Tahoma',sz:11,h:'center'});
-    mg(mA,10,5,10,8);scA('F11','TIPO DE SOLICITUD',{font:'Tahoma',sz:11,bold:true,h:'center'});
-    mg(mA,11,0,11,1);scA('A12','REGIONAL ',{font:'Tahoma',sz:11,bold:true,h:'center'});
-    mg(mA,11,2,11,4);scA('C12',fa.regional,{font:'Tahoma',sz:11,h:'center'});
-    mg(mA,11,5,13,8);scA('F12',fa.alojTipo,{font:'Tahoma',sz:11,h:'center'});
-    mg(mA,12,0,12,1);scA('A13','TELÉFONO',{font:'Tahoma',sz:11,bold:true,h:'center'});
-    mg(mA,12,2,12,4);scA('C13',fa.celular,{font:'Tahoma',sz:11,h:'center'});
-    mg(mA,13,0,13,1);scA('A14','CORREO',{font:'Tahoma',sz:11,bold:true,h:'center'});
-    mg(mA,13,2,13,4);scA('C14',fa.alojCorreo,{font:'Calibri',sz:12,h:'center'});
-    mg(mA,14,0,14,8);scA('A15','');
-    mg(mA,15,0,15,8);scA('A16','RUTA',{font:'Tahoma',sz:11,bold:true,h:'center'});
-    mg(mA,16,0,16,8);scA('A17','');
-    const hc=['A','B','C','D','E','F','G','H','I'];
-    ['GRUPO ','DEPARTAMENTO ','MUNICIPIO/CIUDAD ','FECHA INGRESO','HORA LLEGADA','FECHA SALIDA','HORA SALIDA','NUMERO DE PERSONAS','NUMERO DE NOCHES'].forEach((v,i)=>scA(hc[i]+'18',v,{font:'Tahoma',sz:11,bold:true,h:'center'}));
-    let rr=19;
-    respsConAloj.forEach(resp=>{
-      resp.rutas.forEach(rt=>{
-        [rt.grupo||1,rt.depto,rt.municipio,fmtDate(rt.fecha_ingreso),'12:00 PM - Mediodía',fmtDate(rt.fecha_salida),'1:00 PM - 5:00 PM',rt.personas||1,rt.noches||1].forEach((v,j)=>scA(hc[j]+rr,v,{font:'Tahoma',sz:11,h:'center'}));
-        rr++;
-      });
-    });
-    wsA['!merges']=mA;wsA['!ref']=XLSX.utils.encode_range({s:{r:0,c:0},e:{r:rr+2,c:8}});
-    wb.SheetNames.push('SOLICITUD');wb.Sheets['SOLICITUD']=wsA;
-
-    const wsC={},mC=[];
-    function scC(a,v,o){wsC[a]=mkC(v,o);}
-    wsC['!cols']=[{wch:9},{wch:12.9},{wch:40},{wch:12.7},{wch:13.6},{wch:11.4}];
-    mg(mC,0,3,4,6);scC('D1','SOLICITUD DE ALOJAMIENTO',{font:'Tahoma',sz:18,bold:true,h:'center',wrap:true,brd:[0,0,0,0]});
-    mg(mC,5,3,5,6);scC('D6','Versión: 2023',{font:'Tahoma',sz:11,h:'center',wrap:true,brd:[0,0,0,0]});
-    const bMed=opts=>({...opts,brd:undefined,s:{...((opts&&opts.s)||{}),border:{top:{style:'medium',color:{rgb:'000000'}},bottom:{style:'medium',color:{rgb:'000000'}},left:{style:'medium',color:{rgb:'000000'}},right:{style:'medium',color:{rgb:'000000'}}}}});
-    const hch=['A','B','C','D','E','F'];
-    const chv=['GRUPO','GENERO','NOMBRE COMPLETO ','CÉDULA','TELÉFONO ','ROL '];
-    chv.forEach((v,i)=>{
-      const c={v,t:'s',s:{font:{name:'Tahoma',sz:11,bold:true},alignment:{horizontal:'center',vertical:'center'},border:{top:{style:'medium',color:{rgb:'000000'}},bottom:{style:'medium',color:{rgb:'000000'}},left:{style:'medium',color:{rgb:'000000'}},right:{style:'medium',color:{rgb:'000000'}}}}};
-      wsC[hch[i]+'7']=c;
-    });
-    let cr=8;
-    respsConAloj.forEach(resp=>{
-      resp.campo.forEach(p=>{
-        [p.grupo||1,p.genero,p.nombre,p.cedula,p.telefono,p.rol].forEach((v,j)=>{
-          wsC[hch[j]+cr]={v:v===null||v===undefined?'':v,t:typeof v==='number'?'n':'s',s:{font:{name:j===0?'Tahoma':'Calibri',sz:11},alignment:{horizontal:j===2?undefined:'center',vertical:'center'},border:{top:{style:'medium',color:{rgb:'000000'}},bottom:{style:'medium',color:{rgb:'000000'}},left:{style:'medium',color:{rgb:'000000'}},right:{style:'medium',color:{rgb:'000000'}}}}};
-        });cr++;
-      });
-    });
-    wsC['!merges']=mC;wsC['!ref']=XLSX.utils.encode_range({s:{r:0,c:0},e:{r:cr+1,c:6}});
-    wb.SheetNames.push('LISTA DE CAMPO');wb.Sheets['LISTA DE CAMPO']=wsC;
+  // Add logo image
+  let logoImgId = null;
+  if(typeof LOGO_JPG_B64 !== 'undefined' && LOGO_JPG_B64){
+    logoImgId = wb.addImage({base64: LOGO_JPG_B64, extension:'jpeg'});
   }
-  return wb;
+
+  const N = resps.length;
+  resps.forEach((resp,bi)=>writeBlock(ws, estData, resp, bi, N, bi===0?logoImgId:null));
+
+  const buf = await wb.xlsx.writeBuffer();
+  return buf;
 }
 
-function buildAlojWb(data){
-  const wb={SheetNames:['SOLICITUD','LISTA DE CAMPO'],Sheets:{}};
-  const wsA={},mA=[];
-  function scA(a,v,o){wsA[a]=mkC(v,o);}
-  wsA['!cols']=[{wch:8.4},{wch:19.9},{wch:24.7},{wch:19.3},{wch:26.9},{wch:16.1},{wch:20.1},{wch:16.1},{wch:14}];
-  const hc=['A','B','C','D','E','F','G','H','I'];
-  mg(mA,0,0,5,4);scA('A1','',{brd:[0,0,0,0]});
-  mg(mA,0,5,4,8);scA('F1','SOLICITUD DE ALOJAMIENTO',{font:'Tahoma',sz:18,bold:true,h:'center',wrap:true});
-  mg(mA,5,5,5,8);scA('F6','Versión: 2023',{font:'Tahoma',sz:11,h:'left'});
-  mg(mA,6,0,6,8);scA('A7','');
-  mg(mA,7,0,7,1);scA('A8','NOMBRE DEL ESTUDIO',{font:'Tahoma',sz:11,bold:true,h:'center'});
-  mg(mA,7,2,7,4);scA('C8',data.estudio,{sz:10,h:'center',fill:'FFFFFF'});
-  mg(mA,7,5,7,8);scA('F8','FECHA DE SOLICITUD',{font:'Tahoma',sz:11,bold:true,h:'center'});
-  mg(mA,8,0,8,1);scA('A9','CENTRO DE COSTOS',{font:'Tahoma',sz:11,bold:true,h:'center'});
-  mg(mA,8,2,8,4);scA('C9',data.cc,{sz:10,h:'center',fill:'FFFFFF'});
-  mg(mA,8,5,8,8);scA('F9',fmtDate(data.fecha),{font:'Tahoma',sz:11,h:'center'});
-  mg(mA,9,0,9,8);scA('A10','');
-  mg(mA,10,0,10,1);scA('A11','NOMBRE DEL SOLICITANTE',{font:'Tahoma',sz:11,bold:true,h:'center'});
-  mg(mA,10,2,10,4);scA('C11',data.solicitante,{font:'Tahoma',sz:11,h:'center'});
-  mg(mA,10,5,10,8);scA('F11','TIPO DE SOLICITUD',{font:'Tahoma',sz:11,bold:true,h:'center'});
-  mg(mA,11,0,11,1);scA('A12','REGIONAL ',{font:'Tahoma',sz:11,bold:true,h:'center'});
-  mg(mA,11,2,11,4);scA('C12',data.regional,{font:'Tahoma',sz:11,h:'center'});
-  mg(mA,11,5,13,8);scA('F12',data.tipo,{font:'Tahoma',sz:11,h:'center'});
-  mg(mA,12,0,12,1);scA('A13','TELÉFONO',{font:'Tahoma',sz:11,bold:true,h:'center'});
-  mg(mA,12,2,12,4);scA('C13',data.telefono,{font:'Tahoma',sz:11,h:'center'});
-  mg(mA,13,0,13,1);scA('A14','CORREO',{font:'Tahoma',sz:11,bold:true,h:'center'});
-  mg(mA,13,2,13,4);scA('C14',data.correo,{font:'Calibri',sz:12,h:'center'});
-  mg(mA,14,0,14,8);scA('A15','');
-  mg(mA,15,0,15,8);scA('A16','RUTA',{font:'Tahoma',sz:11,bold:true,h:'center'});
-  mg(mA,16,0,16,8);scA('A17','');
-  ['GRUPO ','DEPARTAMENTO ','MUNICIPIO/CIUDAD ','FECHA INGRESO','HORA LLEGADA','FECHA SALIDA','HORA SALIDA','NUMERO DE PERSONAS','NUMERO DE NOCHES'].forEach((v,i)=>scA(hc[i]+'18',v,{font:'Tahoma',sz:11,bold:true,h:'center'}));
-  (data.rutas||[]).forEach((rt,i)=>{
-    const r=19+i;
-    [rt.grupo||1,rt.depto,rt.municipio,fmtDate(rt.fecha_ingreso),'12:00 PM - Mediodía',fmtDate(rt.fecha_salida),'1:00 PM - 5:00 PM',rt.personas||1,rt.noches||1].forEach((v,j)=>scA(hc[j]+r,v,{font:'Tahoma',sz:11,h:'center'}));
-  });
-  wsA['!merges']=mA;wsA['!ref']=XLSX.utils.encode_range({s:{r:0,c:0},e:{r:21+(data.rutas||[]).length,c:8}});
-  wb.Sheets['SOLICITUD']=wsA;
+async function buildAlojWb(estData, resps){
+  const wb = new ExcelJS.Workbook();
+  wb.creator='CNC'; wb.created=new Date();
+  const ws = wb.addWorksheet('SOLICITUD');
+  [8.4,19.9,24.7,19.3,26.9,16.1,20.1,16.1,14].forEach((w,i)=>{ ws.getColumn(i+1).width=w; });
 
-  const wsC={},mC=[];
-  wsC['!cols']=[{wch:9},{wch:12.9},{wch:40},{wch:12.7},{wch:13.6},{wch:11.4}];
-  mg(mC,0,3,4,6);wsC['D1']={v:'SOLICITUD DE ALOJAMIENTO',t:'s',s:{font:{name:'Tahoma',sz:18,bold:true},alignment:{horizontal:'center',vertical:'center',wrapText:true},border:{}}};
-  mg(mC,5,3,5,6);wsC['D6']={v:'Versión: 2023',t:'s',s:{font:{name:'Tahoma',sz:11},alignment:{horizontal:'center',vertical:'center',wrapText:true},border:{}}};
-  const hch=['A','B','C','D','E','F'];
+  // Logo A1:E6
+  for(let r=1;r<=6;r++) for(let c=1;c<=5;c++){
+    ws.getCell(r,c).border={
+      top:r===1?THIN:NO_B, bottom:r===6?THIN:NO_B,
+      left:c===1?THIN:NO_B, right:c===5?THIN:NO_B
+    };
+  }
+  if(typeof LOGO_JPG_B64!=='undefined'&&LOGO_JPG_B64){
+    const lid=wb.addImage({base64:LOGO_JPG_B64,extension:'jpeg'});
+    ws.addImage(lid,{tl:{col:0.2,row:0.2},br:{col:4.8,row:5.8},editAs:'oneCell'});
+  }
+
+  mg(ws,'F1','I5');
+  sc(ws,'F1','SOLICITUD DE ALOJAMIENTO',{font:tahoma(18,true),align:centerAlign(true),border:brd()});
+  mg(ws,'F6','I6');
+  sc(ws,'F6','Versión: 2023',{font:tahoma(11),align:vcenterAlign('left'),border:brd()});
+
+  mg(ws,'A7','I7'); sc(ws,'A7','',{border:brd()});
+  const ed=estData||{};
+  const fd=(ed.fecha||'').split('-').reverse().join('/');
+  const fa=resps[0]||{};
+
+  function rowData(r,lc1,lc2,label,vc1,vc2,val,rc1,rc2,rlabel){
+    mg(ws,`${lc1}${r}`,`${lc2}${r}`);
+    sc(ws,`${lc1}${r}`,label,{font:tahoma(11,true),align:centerAlign(),border:brd()});
+    mg(ws,`${vc1}${r}`,`${vc2}${r}`);
+    sc(ws,`${vc1}${r}`,val,{font:tahoma(11),align:centerAlign(),border:brd()});
+    if(rc1){ mg(ws,`${rc1}${r}`,`${rc2}${r}`); sc(ws,`${rc1}${r}`,rlabel,{font:tahoma(11,true),align:centerAlign(),border:brd()}); }
+  }
+  rowData(8,'A','B','NOMBRE DEL ESTUDIO','C','E',ed.estudio||'','F','I','FECHA DE SOLICITUD');
+  mg(ws,'F9','I9'); sc(ws,'F9',fd,{font:tahoma(11),align:centerAlign(),border:brd()});
+  rowData(9,'A','B','CENTRO DE COSTOS','C','E',ed.cc||'');
+  mg(ws,'A10','I10'); sc(ws,'A10','',{border:brd()});
+  rowData(11,'A','B','NOMBRE DEL SOLICITANTE','C','E',ed.coord_campo||fa.nombre||'','F','I','TIPO DE SOLICITUD');
+  rowData(12,'A','B','REGIONAL','C','E',fa.regional||'');
+  mg(ws,'F12','I14'); sc(ws,'F12',fa.alojTipo||'Solicitud Inicial',{font:tahoma(11),align:centerAlign(),border:brd()});
+  rowData(13,'A','B','TELÉFONO','C','E',fa.celular||'');
+  rowData(14,'A','B','CORREO','C','E',fa.alojCorreo||'');
+  mg(ws,'A15','I15'); sc(ws,'A15','',{border:brd()});
+  mg(ws,'A16','I16'); sc(ws,'A16','RUTA',{font:tahoma(11,true),align:centerAlign(),border:brd()});
+  mg(ws,'A17','I17'); sc(ws,'A17','',{border:brd()});
+
+  const hcols=['A','B','C','D','E','F','G','H','I'];
+  ['GRUPO ','DEPARTAMENTO ','MUNICIPIO/CIUDAD ','FECHA INGRESO','HORA LLEGADA','FECHA SALIDA','HORA SALIDA','NUMERO DE PERSONAS','NUMERO DE NOCHES']
+    .forEach((v,i)=>sc(ws,`${hcols[i]}18`,v,{font:tahoma(11,true),align:centerAlign(true),border:brd()}));
+
+  let rr=19;
+  resps.forEach(resp=>{
+    if(!resp.tieneAloj||!resp.rutas) return;
+    resp.rutas.forEach(rt=>{
+      const fi=(rt.fecha_ingreso||'').split('-').reverse().join('/');
+      const fs=(rt.fecha_salida||'').split('-').reverse().join('/');
+      [rt.grupo||1,rt.depto||'',rt.municipio||'',fi,'12:00 PM - Mediodía',fs,'1:00 PM - 5:00 PM',rt.personas||1,rt.noches||1]
+        .forEach((v,j)=>sc(ws,`${hcols[j]}${rr}`,v,{font:tahoma(11),align:centerAlign(),border:brd()}));
+      rr++;
+    });
+  });
+
+  // LISTA DE CAMPO sheet
+  const ws2=wb.addWorksheet('LISTA DE CAMPO');
+  [9,12.9,40,12.7,13.6,11.4].forEach((w,i)=>ws2.getColumn(i+1).width=w);
+  mg(ws2,'D1','G1');
+  sc(ws2,'D1','SOLICITUD DE ALOJAMIENTO',{font:tahoma(18,true),align:centerAlign(true)});
+  mg(ws2,'D2','G2');
+  sc(ws2,'D2','Versión: 2023',{font:tahoma(11),align:vcenterAlign('left')});
+  const medBrd={top:{style:'medium',color:{argb:'FF000000'}},bottom:{style:'medium',color:{argb:'FF000000'}},left:{style:'medium',color:{argb:'FF000000'}},right:{style:'medium',color:{argb:'FF000000'}}};
   ['GRUPO','GENERO','NOMBRE COMPLETO ','CÉDULA','TELÉFONO ','ROL '].forEach((v,i)=>{
-    wsC[hch[i]+'7']={v,t:'s',s:{font:{name:'Tahoma',sz:11,bold:true},alignment:{horizontal:'center',vertical:'center'},border:{top:{style:'medium',color:{rgb:'000000'}},bottom:{style:'medium',color:{rgb:'000000'}},left:{style:'medium',color:{rgb:'000000'}},right:{style:'medium',color:{rgb:'000000'}}}}};
+    const c=ws2.getCell(4,i+1); c.value=v;
+    c.font={name:'Tahoma',size:11,bold:true}; c.alignment={horizontal:'center',vertical:'middle'}; c.border=medBrd;
   });
-  (data.campo||[]).forEach((p,i)=>{
-    const r=8+i;
-    [p.grupo||1,p.genero,p.nombre,p.cedula,p.telefono,p.rol].forEach((v,j)=>{
-      wsC[hch[j]+r]={v:v===null||v===undefined?'':v,t:typeof v==='number'?'n':'s',s:{font:{name:j===0?'Tahoma':'Calibri',sz:11},alignment:{horizontal:j===2?undefined:'center',vertical:'center'},border:{top:{style:'medium',color:{rgb:'000000'}},bottom:{style:'medium',color:{rgb:'000000'}},left:{style:'medium',color:{rgb:'000000'}},right:{style:'medium',color:{rgb:'000000'}}}}};
+  let cr=5;
+  resps.forEach(resp=>{
+    if(!resp.tieneAloj||!resp.campo) return;
+    resp.campo.forEach(p=>{
+      [p.grupo||1,p.genero||'Femenino',p.nombre||'',p.cedula||'',p.telefono||'',p.rol||'Encuestador'].forEach((v,j)=>{
+        const c=ws2.getCell(cr,j+1); c.value=v;
+        c.font={name:j===0?'Tahoma':'Calibri',size:11};
+        c.alignment={horizontal:j===2?'left':'center',vertical:'middle'};
+        c.border=medBrd;
+      });
+      cr++;
     });
   });
-  wsC['!merges']=mC;wsC['!ref']=XLSX.utils.encode_range({s:{r:0,c:0},e:{r:9+(data.campo||[]).length,c:6}});
-  wb.Sheets['LISTA DE CAMPO']=wsC;
-  return wb;
+
+  const buf=await wb.xlsx.writeBuffer();
+  return buf;
 }
 
 async function genAnticipo(){
@@ -1118,41 +1188,43 @@ async function genAnticipo(){
   const estData={cc:gv('a-cc'),estudio:gv('a-est'),fecha:gv('a-fecha'),
                  dir_proy:gv('a-dir-proy'),dir_campo:gv('a-dir'),coord_campo:gv('a-coord')};
   try{
-    const wb=buildAnticipoWb(estData,resps);
+    setSt('st-a','<span class="spin"></span> Generando Excel...','info');
+    const buf = await buildAnticipoWb(estData, resps);
     const fname=`ANTICIPO_${estData.cc||'NUEVO'}_${estData.fecha||new Date().toISOString().slice(0,10)}.xlsx`;
-    await writeXlsxWithLogo(wb,fname,resps.length);
+    const blob = new Blob([buf], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    saveAs(blob, fname);
     const tieneAloj=resps.some(r=>r.tieneAloj);
     addToHistorial(estData,resps);
     cancelarEdicion();
     setSt('st-a',`&#10003; "${fname}" guardado en historial y descargado. <a href="#" onclick="switchTab('h');return false" style="color:inherit;font-weight:600;text-decoration:underline">Ver historial →</a> &nbsp;|&nbsp; <a href="#" onclick="limpiarFormulario();return false" style="color:inherit;font-weight:600;text-decoration:underline">Nueva solicitud →</a>`,'ok');
   }catch(e){setSt('st-a','Error: '+e.message,'err');console.error(e);}
 }
-function genAloj(){
+async function genAloj(){
   const rutas=Array.from(document.querySelectorAll('#tb-r tr')).map(tr=>{
     const c=tr.querySelectorAll('input,select');
     return{grupo:parseInt(c[0]?.value)||1,depto:c[1]?.value||'',municipio:c[2]?.value||'',
-           fecha_ingreso:c[3]?.value||'',fecha_salida:c[4]?.value||'',personas:parseInt(c[5]?.value)||1,noches:parseInt(c[6]?.value)||1};
+           fecha_ingreso:c[3]?.value||'',fecha_salida:c[4]?.value||'',
+           personas:parseInt(c[5]?.value)||1,noches:parseInt(c[6]?.value)||1};
   });
   const campo=Array.from(document.querySelectorAll('#tb-c tr')).map(tr=>{
     const c=tr.querySelectorAll('input,select');
-    return{grupo:parseInt(c[0]?.value)||1,genero:c[1]?.value||'Femenino',nombre:c[2]?.value||'',cedula:c[3]?.value||'',telefono:c[4]?.value||'',rol:c[5]?.value||'Encuestador'};
+    return{grupo:parseInt(c[0]?.value)||1,genero:c[1]?.value||'Femenino',nombre:c[2]?.value||'',
+           cedula:c[3]?.value||'',telefono:c[4]?.value||'',rol:c[5]?.value||'Encuestador'};
   });
   if(!rutas.length){setSt('st-l','Agrega al menos una fila de ruta.','err');return}
-  const data={estudio:gv('l-est'),cc:gv('l-cc'),fecha:gv('l-fecha'),solicitante:gv('l-sol'),
-              regional:gv('l-reg'),tipo:gv('l-tipo'),telefono:gv('l-tel'),correo:gv('l-mail'),rutas,campo};
+  const estData={estudio:gv('l-est'),cc:gv('l-cc'),fecha:gv('l-fecha'),coord_campo:gv('l-sol')};
+  const pseudoResp={regional:gv('l-reg'),alojTipo:gv('l-tipo'),celular:gv('l-tel'),
+                    alojCorreo:gv('l-mail'),nombre:gv('l-sol'),tieneAloj:true,rutas,campo};
   try{
-    const wb=buildAlojWb(data);
-    const fname=`ALOJAMIENTO_${data.estudio||data.cc||'NUEVO'}_${data.fecha||new Date().toISOString().slice(0,10)}.xlsx`;
-    XLSX.writeFile(wb,fname,{cellStyles:true,bookSST:false});
+    setSt('st-l','<span class="spin"></span> Generando Excel...','info');
+    const buf = await buildAlojWb(estData, [pseudoResp]);
+    const fname=`ALOJAMIENTO_${estData.estudio||estData.cc||'NUEVO'}_${estData.fecha||new Date().toISOString().slice(0,10)}.xlsx`;
+    const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    saveAs(blob, fname);
     setSt('st-l',`&#10003; "${fname}" descargado.`,'ok');
   }catch(e){setSt('st-l','Error: '+e.message,'err');console.error(e);}
 }
 
-// Init moved to appInit() to guarantee DOM is ready
-
-// ============================================================
-//  HISTORIAL
-// ============================================================
 let historial = [];
 
 function addToHistorial(estData, resps){
@@ -1284,84 +1356,6 @@ function exportHistorial(){
 
 // ============================================================
 //  EXCEL + LOGO INJECTION VIA JSZIP
-// ============================================================
-function buildDrawingXml(numBlocks){
-  const BLOCK = 36;
-  let anchors = '';
-  for(let i=0;i<numBlocks;i++){
-    const rowFrom = i * BLOCK;
-    const rowTo   = rowFrom + 3;
-    const rId = 'rId'+(i+1);
-    anchors += '<xdr:twoCellAnchor editAs="oneCell">'
-      +'<xdr:from><xdr:col>1</xdr:col><xdr:colOff>142875</xdr:colOff><xdr:row>'+rowFrom+'</xdr:row><xdr:rowOff>104775</xdr:rowOff></xdr:from>'
-      +'<xdr:to><xdr:col>2</xdr:col><xdr:colOff>666750</xdr:colOff><xdr:row>'+rowTo+'</xdr:row><xdr:rowOff>66675</xdr:rowOff></xdr:to>'
-      +'<xdr:pic><xdr:nvPicPr>'
-      +'<xdr:cNvPr id="'+(i+2)+'" name="Logo '+(i+1)+'"/>'
-      +'<xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr>'
-      +'</xdr:nvPicPr>'
-      +'<xdr:blipFill>'
-      +'<a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="'+rId+'"/>'
-      +'<a:srcRect/><a:stretch><a:fillRect/></a:stretch>'
-      +'</xdr:blipFill>'
-      +'<xdr:spPr bwMode="auto">'
-      +'<a:xfrm><a:off x="914400" y="104775"/><a:ext cx="1381125" cy="533400"/></a:xfrm>'
-      +'<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>'
-      +'<a:noFill/><a:ln><a:noFill/></a:ln>'
-      +'</xdr:spPr></xdr:pic><xdr:clientData/>'
-      +'</xdr:twoCellAnchor>';
-  }
-  return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
-    +'<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">'+anchors+'</xdr:wsDr>';
-}
-
-function buildDrawingRels(numBlocks){
-  let rels = '';
-  for(let i=0;i<numBlocks;i++){
-    rels += '<Relationship Id="rId'+(i+1)+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/logo_cnc.jpeg"/>';
-  }
-  return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
-    +'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+rels+'</Relationships>';
-}
-
-async function writeXlsxWithLogo(wb, fname, numAnticipo){
-  try{
-    const xlsxData = XLSX.write(wb, {bookType:'xlsx', type:'array', cellStyles:true, bookSST:false});
-    const zip = await JSZip.loadAsync(xlsxData);
-    // Inject logo image
-    const logoBytes = Uint8Array.from(atob(LOGO_JPG_B64), c=>c.charCodeAt(0));
-    zip.file('xl/media/logo_cnc.jpeg', logoBytes);
-    // Inject drawing XML
-    zip.file('xl/drawings/drawing1.xml', buildDrawingXml(numAnticipo));
-    // Drawing relationships
-    zip.folder('xl/drawings/_rels');
-    zip.file('xl/drawings/_rels/drawing1.xml.rels', buildDrawingRels(numAnticipo));
-    // Sheet relationships - add drawing ref if not present
-    const sheetRelsFile = zip.file('xl/worksheets/_rels/sheet1.xml.rels');
-    let sheetRels = sheetRelsFile ? await sheetRelsFile.async('text') : '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>';
-    if(!sheetRels.includes('drawing1.xml')){
-      sheetRels = sheetRels.replace('</Relationships>', '<Relationship Id="rIdDrw1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing1.xml"/></Relationships>');
-      zip.folder('xl/worksheets/_rels');
-      zip.file('xl/worksheets/_rels/sheet1.xml.rels', sheetRels);
-    }
-    // Content types
-    let ct = await zip.file('[Content_Types].xml').async('text');
-    if(!ct.includes('jpeg')) ct = ct.replace('</Types>','<Default Extension="jpeg" ContentType="image/jpeg"/></Types>');
-    if(!ct.includes('drawing+xml')) ct = ct.replace('</Types>','<Override PartName="/xl/drawings/drawing1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/></Types>');
-    zip.file('[Content_Types].xml', ct);
-    // Generate and download
-    const out = await zip.generateAsync({type:'arraybuffer',compression:'DEFLATE',compressionOptions:{level:6}});
-    const blob = new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href=url; a.download=fname; a.click();
-    setTimeout(()=>URL.revokeObjectURL(url),1000);
-  } catch(e){
-    console.error('Logo injection failed, falling back:', e);
-    XLSX.writeFile(wb, fname, {cellStyles:true, bookSST:false});
-  }
-}
-
-// ============================================================
-//  LIMPIAR FORMULARIO
 // ============================================================
 function limpiarFormulario(){
   if(!confirm('¿Limpiar el formulario para ingresar una nueva solicitud?\nLos datos actuales NO se guardarán en el historial.')) return;
@@ -1572,6 +1566,8 @@ function appInit(){
   loadCCBudgetsLocal();
   // Wire presupuesto file drop
   initPresupDrop();
+  // Wire searchable depto/mun dropdowns
+  setTimeout(wireAllDeptoMun, 100);
 }
 if(document.readyState==='loading'){
   document.addEventListener('DOMContentLoaded', appInit);
@@ -2049,6 +2045,406 @@ function initPresupDrop(){
   drop.addEventListener('drop', e=>{
     e.preventDefault();drop.classList.remove('drag-over');
     handlePresupFiles(Array.from(e.dataTransfer.files));
+  });
+}
+
+async function exportHistorial(){
+  if(!historial.length){alert('No hay solicitudes en el historial.');return;}
+  const wb = new ExcelJS.Workbook();
+  wb.creator='CNC'; wb.created=new Date();
+  const ws = wb.addWorksheet('Historial');
+  const cols=['#','Fecha generación','CC','Estudio','Fecha solicitud','Dir. Proyecto',
+              'Dir. Campo','Coordinador','Responsable','Cédula','Celular','Regional',
+              'Ruta','Municipio','Medio de envío','Conceptos','Total anticipo','Alojamiento','Usuario'];
+  const widths=[5,18,12,28,12,18,18,20,22,14,14,12,22,16,28,35,14,10,16];
+  cols.forEach((h,i)=>{
+    const c=ws.getCell(1,i+1);
+    c.value=h;
+    c.font={name:'Arial',size:10,bold:true,color:{argb:'FFFFFFFF'}};
+    c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF1A1A1A'}};
+    c.alignment={horizontal:'center',vertical:'middle',wrapText:true};
+    c.border={top:{style:'thin'},bottom:{style:'thin'},left:{style:'thin'},right:{style:'thin'}};
+    ws.getColumn(i+1).width=widths[i];
+  });
+  ws.getRow(1).height=28;
+  historial.forEach((h,i)=>{
+    const r=i+2;
+    const vals=[i+1,h.fechaGen,h.cc,h.estudio,h.fecha,h.dirProy,h.dirCampo,h.coord,
+                h.nombre,h.cedula,h.celular,h.regional,h.ruta,h.municipio,h.medio,
+                h.filas.map(f=>f.concepto).join(', '),h.total,h.tieneAloj?'Sí':'No',h.usuario||''];
+    vals.forEach((v,j)=>{
+      const c=ws.getCell(r,j+1);
+      c.value=v===null||v===undefined?'':v;
+      c.font={name:'Arial',size:10};
+      c.alignment={vertical:'middle',wrapText:j===15};
+      c.border={top:{style:'thin'},bottom:{style:'thin'},left:{style:'thin'},right:{style:'thin'}};
+      if(j===16) c.numFmt='#,##0';
+    });
+    ws.getRow(r).height=18;
+  });
+  const buf=await wb.xlsx.writeBuffer();
+  const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  saveAs(blob,`HISTORIAL_ANTICIPOS_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
+
+const COLOMBIA = {"Amazonas":["Leticia","Puerto Nariño","El Encanto","La Chorrera","La Pedrera","La Victoria","Mirití-Paraná","Puerto Alegría","Puerto Arica","Puerto Santander","Tarapacá"],"Antioquia":["Medellín","Abejorral","Abriaquí","Alejandría","Amagá","Amalfi","Andes","Angelópolis","Angostura","Anorí","Anzá","Apartadó","Arboletes","Argelia","Armenia","Barbosa","Bello","Belmira","Betania","Betulia","Briceño","Buriticá","Cáceres","Caicedo","Caldas","Campamento","Cañasgordas","Caracolí","Caramanta","Carepa","Carolina del Príncipe","Caucasia","Chigorodó","Cisneros","Ciudad Bolívar","Cocorná","Concepción","Concordia","Copacabana","Dabeiba","Don Matías","Ebéjico","El Bagre","El Carmen de Viboral","El Santuario","Entrerríos","Envigado","Fredonia","Frontino","Giraldo","Girardota","Gómez Plata","Granada","Guadalupe","Guarne","Guatapé","Heliconia","Hispania","Itagüí","Ituango","Jardín","Jericó","La Ceja","La Estrella","La Pintada","La Unión","Liborina","Maceo","Marinilla","Montebello","Murindó","Mutatá","Nariño","Nechí","Necoclí","Olaya","Peñol","Peque","Pueblorrico","Puerto Berrío","Puerto Nare","Puerto Triunfo","Remedios","Retiro","Rionegro","Sabanalarga","Sabaneta","Salgar","San Andrés de Cuerquia","San Carlos","San Francisco","San Jerónimo","San José de la Montaña","San Juan de Urabá","San Luis","San Pedro de los Milagros","San Pedro de Urabá","San Rafael","San Roque","San Vicente Ferrer","Santa Bárbara","Santa Fe de Antioquia","Santa Rosa de Osos","Santo Domingo","Segovia","Sonsón","Sopetrán","Támesis","Tarazá","Tarso","Titiribí","Toledo","Turbo","Uramita","Urrao","Valdivia","Valparaíso","Vegachí","Venecia","Vigía del Fuerte","Yalí","Yarumal","Yolombó","Yondó","Zaragoza"],"Arauca":["Arauca","Arauquita","Cravo Norte","Fortul","Puerto Rondón","Saravena","Tame"],"Atlántico":["Barranquilla","Baranoa","Campo de la Cruz","Candelaria","Galapa","Juan de Acosta","Luruaco","Malambo","Manatí","Palmar de Varela","Piojó","Polonuevo","Ponedera","Puerto Colombia","Repelón","Sabanagrande","Sabanalarga","Santa Lucía","Santo Tomás","Soledad","Suan","Tubará","Usiacurí"],"Bolívar":["Cartagena","Achí","Altos del Rosario","Arenal","Arjona","Arroyohondo","Barranco de Loba","Calamar","Cantagallo","Cicuco","Clemencia","Córdoba","El Carmen de Bolívar","El Guamo","El Peñón","Hatillo de Loba","Magangué","Mahates","Margarita","María la Baja","Montecristo","Mompós","Morales","Norosí","Pinillos","Regidor","Río Viejo","San Cristóbal","San Estanislao","San Fernando","San Jacinto","San Jacinto del Cauca","San Juan Nepomuceno","San Martín de Loba","San Pablo","Santa Catalina","Santa Rosa","Santa Rosa del Sur","Simití","Soplaviento","Talaigua Nuevo","Tiquisio","Turbaco","Turbaná","Villanueva","Zambrano"],"Boyacá":["Tunja","Almeida","Aquitania","Arcabuco","Belén","Berbeo","Betéitiva","Boavita","Boyacá","Briceño","Buenavista","Busbanzá","Caldas","Campohermoso","Cerinza","Chinavita","Chiquinquirá","Chíquiza","Chiscas","Chita","Chitaraque","Chivatá","Chivor","Ciénega","Cómbita","Coper","Corrales","Covarachía","Cubará","Cucaita","Cuítiva","Duitama","El Cocuy","El Espino","Firavitoba","Floresta","Gachantivá","Gámeza","Garagoa","Guacamayas","Guateque","Guayatá","Güicán","Iza","Jenesano","Jericó","La Capilla","La Uvita","La Victoria","Labranzagrande","Macanal","Maripí","Miraflores","Mongua","Monguí","Moniquirá","Motavita","Muzo","Nobsa","Nuevo Colón","Oicatá","Otanche","Pachavita","Páez","Paipa","Pajarito","Panqueba","Pauna","Paya","Paz de Río","Pesca","Pisba","Puerto Boyacá","Quípama","Ramiriquí","Ráquira","Rondón","Saboyá","Sáchica","Samacá","San Eduardo","San José de Pare","San Luis de Gaceno","San Mateo","San Miguel de Sema","San Pablo de Borbur","Santana","Santa María","Santa Rosa de Viterbo","Santa Sofía","Sativasur","Sativanorte","Siachoque","Soatá","Socotá","Socha","Sogamoso","Somondoco","Sora","Soracá","Sotaquirá","Susacón","Sutamarchán","Sutatenza","Tasco","Tenza","Tibaná","Tibasosa","Tinjacá","Tipacoque","Toca","Togüí","Tópaga","Tota","Turmequé","Tuta","Tutazá","Umbita","Ventaquemada","Viracachá","Zetaquira"],"Caldas":["Manizales","Aguadas","Anserma","Aranzazu","Belalcázar","Chinchiná","Filadelfia","La Dorada","La Merced","Manzanares","Marmato","Marquetalia","Marulanda","Neira","Norcasia","Pácora","Palestina","Pensilvania","Riosucio","Riosucio","Risaralda","Salamina","Samaná","San José","Supía","Victoria","Villamaría","Viterbo"],"Caquetá":["Florencia","Albania","Belén de los Andaquíes","Cartagena del Chairá","Curillo","El Doncello","El Paujil","La Montañita","Milán","Morelia","Puerto Rico","San José del Fragua","San Vicente del Caguán","Solano","Solita","Valparaíso"],"Casanare":["Yopal","Aguazul","Chámeza","Hato Corozal","La Salina","Maní","Monterrey","Nunchía","Orocué","Paz de Ariporo","Pore","Recetor","Sabanalarga","Sácama","San Luis de Palenque","Támara","Tauramena","Trinidad","Villanueva"],"Cauca":["Popayán","Almaguer","Argelia","Balboa","Bolívar","Buenos Aires","Cajibío","Caldono","Caloto","Corinto","El Tambo","Florencia","Guachené","Guapí","Inzá","Jambaló","La Sierra","La Vega","López de Micay","Mercaderes","Miranda","Morales","Padilla","Páez","Patía","Piamonte","Piendamó","Puerto Tejada","Puracé","Rosas","San Sebastián","Santa Rosa","Santander de Quilichao","Silvia","Sotará","Suárez","Sucre","Timbío","Timbiquí","Toribío","Totoró","Villa Rica"],"Cesar":["Valledupar","Aguachica","Agustín Codazzi","Astrea","Becerril","Bosconia","Chimichagua","Chiriguaná","Curumaní","El Copey","El Paso","Gamarra","González","La Gloria","La Jagua de Ibirico","La Paz","Manaure","Pailitas","Pelaya","Pueblo Bello","Río de Oro","San Alberto","San Diego","San Martín","Tamalameque"],"Chocó":["Quibdó","Acandí","Alto Baudó","Atrato","Bagadó","Bahía Solano","Bajo Baudó","Bojayá","Carmen del Darién","Cértegui","Condoto","El Carmen de Atrato","El Litoral del San Juan","Istmina","Juradó","Lloró","Medio Atrato","Medio Baudó","Medio San Juan","Nóvita","Nuquí","Río Iro","Río Quito","Riosucio","San José del Palmar","Sipí","Tadó","Unguía","Unión Panamericana"],"Córdoba":["Montería","Ayapel","Buenavista","Canalete","Cereté","Chimá","Chinú","Ciénaga de Oro","Cotorra","La Apartada","Lorica","Los Córdobas","Momil","Montelíbano","Moñitos","Planeta Rica","Pueblo Nuevo","Puerto Escondido","Puerto Libertador","Purísima","Sahagún","San Andrés de Sotavento","San Antero","San Bernardo del Viento","San Carlos","San José de Uré","San Pelayo","Tierralta","Tuchín","Valencia"],"Cundinamarca":["Bogotá D.C.","Agua de Dios","Albán","Anapoima","Anolaima","Arbeláez","Beltrán","Bituima","Bojacá","Cabrera","Cachipay","Cajicá","Caparrapí","Cáqueza","Carmen de Carupa","Chaguaní","Chía","Chipaque","Choachí","Chocontá","Cogua","Cota","Cucunubá","El Colegio","El Peñón","El Rosal","Facatativá","Fomeque","Fosca","Funza","Fúquene","Fusagasugá","Gachalá","Gachancipá","Gachetá","Gama","Girardot","Granada","Guachetá","Guaduas","Guasca","Guataquí","Guatavita","Guayabal de Síquima","Guayabetal","Gutiérrez","Jerusalén","Junín","La Calera","La Mesa","La Palma","La Peña","La Vega","Lenguazaque","Machetá","Madrid","Manta","Medina","Mosquera","Nariño","Nemocón","Nilo","Nimaima","Nocaima","Pacho","Paime","Pandi","Paratebueno","Pasca","Puerto Salgar","Pulí","Quebradanegra","Quetame","Quipile","Ricaurte","San Antonio del Tequendama","San Bernardo","San Cayetano","San Francisco","San Juan de Río Seco","Sasaima","Sesquilé","Sibaté","Silvania","Simijaca","Soacha","Sopó","Subachoque","Suesca","Supatá","Susa","Sutatausa","Tabio","Tausa","Tena","Tenjo","Tibacuy","Tibirita","Tocaima","Tocancipá","Topaipí","Ubalá","Ubaque","Ubaté","Une","Útica","Venecia","Vergara","Vianí","Villagómez","Villapinzón","Villeta","Viotá","Yacopí","Zipacón","Zipaquirá","Melgar"],"Guainía":["Inírida","Barranco Minas","Cacahual","La Guadalupe","Mapiripana","Morichal Nuevo","Pana Pana","Puerto Colombia","San Felipe"],"Guaviare":["San José del Guaviare","Calamar","El Retorno","Miraflores"],"Huila":["Neiva","Acevedo","Agrado","Aipe","Algeciras","Altamira","Baraya","Campoalegre","Colombia","Elías","Garzón","Gigante","Guadalupe","Hobo","Iquira","Isnos","La Argentina","La Plata","Nátaga","Oporapa","Paicol","Palermo","Palestina","Pital","Pitalito","Rivera","Saladoblanco","San Agustín","Santa María","Suaza","Tarqui","Tello","Teruel","Tesalia","Timaná","Villavieja","Yaguará"],"La Guajira":["Riohacha","Albania","Barrancas","Dibulla","Distracción","El Molino","Fonseca","Hatonuevo","La Jagua del Pilar","Maicao","Manaure","San Juan del Cesar","Uribia","Urumita","Villanueva"],"Magdalena":["Santa Marta","Algarrobo","Aracataca","Ariguaní","Cerro de San Antonio","Chivolo","Ciénaga","Concordia","El Banco","El Piñón","El Retén","Fundación","Guamal","Nueva Granada","Pedraza","Pijiño del Carmen","Pivijay","Plato","Puebloviejo","Remolino","Sabanas de San Ángel","Salamina","San Sebastián de Buenavista","San Zenón","Santa Ana","Santa Bárbara de Pinto","Sitionuevo","Tenerife","Zapayán","Zona Bananera"],"Meta":["Villavicencio","Acacías","Barranca de Upía","Cabuyaro","Castilla la Nueva","Cubarral","Cumaral","El Calvario","El Castillo","El Dorado","Fuente de Oro","Granada","Guamal","La Macarena","Lejanías","Mapiripán","Mesetas","La Uribe","Puerto Concordia","Puerto Gaitán","Puerto Lleras","Puerto López","Puerto Rico","Restrepo","San Carlos de Guaroa","San Juan de Arama","San Juanito","San Martín","Vista Hermosa"],"Nariño":["Pasto","Albán","Aldana","Ancuyá","Arboleda","Barbacoas","Belén","Buesaco","Colón","Consacá","Contadero","Córdoba","Cuaspud","Cumbal","Cumbitara","El Charco","El Peñol","El Rosario","El Tablón de Gómez","El Tambo","Francisco Pizarro","Funes","Guachucal","Guaitarilla","Gualmatán","Iles","Imués","Ipiales","La Cruz","La Florida","La Llanada","La Tola","La Unión","Leiva","Linares","Los Andes","Magüí","Mallama","Mosquera","Nariño","Olaya Herrera","Ospina","Policarpa","Potosí","Providencia","Puerres","Pupiales","Ricaurte","Roberto Payán","Samaniego","San Bernardo","San Lorenzo","San Pablo","San Pedro de Cartago","Sandoná","Santa Bárbara","Santacruz","Sapuyes","Taminango","Tangua","Tumaco","Túquerres","Yacuanquer"],"Norte de Santander":["Cúcuta","Ábrego","Arboledas","Bochalema","Bucarasica","Cácota","Cáchira","Chinácota","Chitagá","Convención","Cucutilla","Durania","El Carmen","El Tarra","El Zulia","Gramalote","Hacarí","Herrán","La Esperanza","La Playa","Labateca","Los Patios","Lourdes","Mutiscua","Ocaña","Pamplona","Pamplonita","Puerto Santander","Ragonvalia","Salazar","San Calixto","San Cayetano","Santiago","Sardinata","Silos","Teorama","Tibú","Toledo","Villa Caro","Villa del Rosario"],"Putumayo":["Mocoa","Colón","Orito","Puerto Asís","Puerto Caicedo","Puerto Guzmán","Puerto Leguízamo","San Francisco","San Miguel","Santiago","Sibundoy","Valle del Guamuez","Villagarzón"],"Quindío":["Armenia","Buenavista","Calarcá","Circasia","Córdoba","Filandia","Génova","La Tebaida","Montenegro","Pijao","Quimbaya","Salento"],"Risaralda":["Pereira","Apía","Balboa","Belén de Umbría","Dosquebradas","Guática","La Celia","La Virginia","Marsella","Mistrató","Pueblo Rico","Quinchía","Santa Rosa de Cabal","Santuario"],"San Andrés y Providencia":["San Andrés","Providencia"],"Santander":["Bucaramanga","Aguada","Albania","Aratoca","Barbosa","Barichara","Barrancabermeja","Betulia","Bolívar","Cabrera","California","Capitanejo","Carcasí","Cepitá","Cerrito","Charalá","Charta","Chima","Chipatá","Cimitarra","Concepción","Confines","Contratación","Coromoro","Curití","El Carmen de Chucurí","El Guacamayo","El Playón","El Socorro","Encino","Enciso","Florián","Floridablanca","Galán","Gámbita","Girón","Guaca","Guadalupe","Guapotá","Guavatá","Güepsa","Hato","Jesús María","Jordán","La Belleza","La Paz","Landázuri","Lebrija","Los Santos","Macaravita","Málaga","Matanza","Mogotes","Molagavita","Ocamonte","Oiba","Onzaga","Palmar","Páramo","Piedecuesta","Pinchote","Puente Nacional","Puerto Parra","Puerto Wilches","Rionegro","Sabana de Torres","San Andrés","San Benito","San Gil","San Joaquín","San José de Miranda","San Miguel","San Vicente de Chucurí","Santa Bárbara","Santa Helena del Opón","Simacota","Suaita","Sucre","Suratá","Tona","Valle de San José","Vélez","Vetas","Villanueva","Zapatoca"],"Sucre":["Sincelejo","Buenavista","Caimito","Chalán","Colosó","Corozal","Coveñas","El Roble","Galeras","Guaranda","La Unión","Los Palmitos","Majagual","Morroa","Ovejas","Palmito","Sampués","San Benito Abad","San Juan de Betulia","San Marcos","San Onofre","San Pedro","Santiago de Tolú","Sincé","Sucre","Tolú Viejo"],"Tolima":["Ibagué","Alpujarra","Alvarado","Ambalema","Anzoátegui","Armero","Ataco","Cajamarca","Carmen de Apicalá","Casabianca","Chaparral","Coello","Coyaima","Cunday","Dolores","Espinal","Falan","Flandes","Fresno","Guamo","Herveo","Honda","Icononzo","Lérida","Líbano","Mariquita","Melgar","Murillo","Natagaima","Ortega","Palocabildo","Piedras","Planadas","Prado","Purificación","Rioblanco","Roncesvalles","Rovira","Saldaña","San Antonio","San Luis","Santa Isabel","Suárez","Valle de San Juan","Venadillo","Villahermosa","Villarrica"],"Valle del Cauca":["Cali","Alcalá","Andalucía","Ansermanuevo","Argelia","Bolívar","Buenaventura","Buga","Bugalagrande","Caicedonia","Calima","Candelaria","Cartago","Dagua","El Águila","El Cairo","El Cerrito","El Dovio","Florida","Ginebra","Guacarí","Jamundí","La Cumbre","La Unión","La Victoria","Obando","Palmira","Pradera","Restrepo","Riofrío","Roldanillo","San Pedro","Sevilla","Toro","Trujillo","Tuluá","Ulloa","Versalles","Vijes","Yotoco","Yumbo","Zarzal"],"Vaupés":["Mitú","Carurú","Pacoa","Papunaua","Taraira","Yavaraté"],"Vichada":["Puerto Carreño","Cumaribo","La Primavera","Santa Rosalía"]};
+const DEPTOS_LIST = Object.keys(COLOMBIA).sort();
+
+function createSearchSelect(inputEl, type, linkedDeptoInput){
+  if(inputEl.dataset.wired) return;
+  inputEl.dataset.wired = "1";
+  inputEl.readOnly = false;
+  inputEl.autocomplete = "off";
+
+  const wrap = document.createElement("div");
+  wrap.className = "sel-wrap";
+  inputEl.parentNode.insertBefore(wrap, inputEl);
+  wrap.appendChild(inputEl);
+  wrap.insertAdjacentHTML("beforeend", '<span class="sel-arrow">&#9660;</span>');
+
+  const dd = document.createElement("div");
+  dd.className = "sel-dd";
+  wrap.appendChild(dd);
+
+  function getOptions(){
+    if(type==="depto") return DEPTOS_LIST;
+    const depto = linkedDeptoInput ? linkedDeptoInput.value : "";
+    if(depto && COLOMBIA[depto]) return [...COLOMBIA[depto]].sort();
+    return Object.values(COLOMBIA).flat().sort((a,b)=>a.localeCompare(b));
+  }
+
+  function renderDd(filter){
+    const opts = getOptions();
+    const q = normMun(filter||"");
+    const filtered = q.length>=1 ? opts.filter(o=>normMun(o).includes(q)) : opts;
+    const shown = filtered.slice(0,80);
+    dd.innerHTML = shown.length
+      ? shown.map(o=>`<div class="sel-opt" data-val="${o}">${o}</div>`).join("")
+        + (filtered.length>80 ? `<div class="sel-opt" style="color:#aaa;font-size:11px;cursor:default">...${filtered.length-80} más, escribe para filtrar</div>` : "")
+      : '<div class="sel-opt" style="color:#bbb;cursor:default">Sin resultados</div>';
+    dd.querySelectorAll(".sel-opt[data-val]").forEach(el=>{
+      el.addEventListener("mousedown", e=>{
+        e.preventDefault();
+        inputEl.value = el.dataset.val;
+        inputEl.dispatchEvent(new Event("change",{bubbles:true}));
+        inputEl.dispatchEvent(new Event("input",{bubbles:true}));
+        dd.classList.remove("open");
+      });
+    });
+  }
+
+  inputEl.addEventListener("focus", ()=>{ renderDd(inputEl.value); dd.classList.add("open"); });
+  inputEl.addEventListener("input", ()=>{ renderDd(inputEl.value); dd.classList.add("open"); });
+  inputEl.addEventListener("blur",  ()=>setTimeout(()=>dd.classList.remove("open"),200));
+  wrap.querySelector(".sel-arrow").addEventListener("mousedown", e=>{
+    e.preventDefault();
+    if(dd.classList.contains("open")) dd.classList.remove("open");
+    else { inputEl.focus(); renderDd(inputEl.value); dd.classList.add("open"); }
+  });
+}
+
+function wireDeptoMun(rb){
+  const deptoInput = rb.querySelector(".resp-depto");
+  const munInput   = rb.querySelector(".resp-mun");
+  if(!deptoInput||!munInput) return;
+  createSearchSelect(deptoInput, "depto", null);
+  createSearchSelect(munInput,   "mun",   deptoInput);
+  deptoInput.addEventListener("change", ()=>{
+    munInput.value="";
+    const rId=rb.id.replace("rb-","");
+    updateBudget(rId);
+  });
+}
+
+function calcNochesRow(tr){
+  const inputs = tr.querySelectorAll("input");
+  const fiInput = inputs[3];
+  const fsInput = inputs[4];
+  const nochesInput = inputs[6];
+  if(!fiInput||!fsInput||!nochesInput) return;
+  function calc(){
+    if(fiInput.value&&fsInput.value){
+      const diff = Math.round((new Date(fsInput.value+"T00:00:00")-new Date(fiInput.value+"T00:00:00"))/86400000);
+      if(diff>0){ nochesInput.value=diff; nochesInput.style.background="#e6f9ef"; }
+      else if(diff<=0){ nochesInput.style.background="#fde8e8"; }
+    }
+  }
+  if(!fiInput.dataset.nightWired){
+    fiInput.dataset.nightWired="1";
+    fiInput.addEventListener("change", calc);
+    fsInput.addEventListener("change", calc);
+  }
+}
+
+function wireAlojRow(tr){
+  if(!tr) return;
+  const inputs = tr.querySelectorAll("input");
+  const deptoInput = inputs[1];
+  const munInput   = inputs[2];
+  if(deptoInput&&munInput){
+    createSearchSelect(deptoInput, "depto", null);
+    createSearchSelect(munInput,   "mun",   deptoInput);
+    deptoInput.addEventListener("change", ()=>{ munInput.value=""; });
+  }
+  calcNochesRow(tr);
+}
+
+// Patch addAlojRuta to auto-wire new rows
+const _origAR = addAlojRuta;
+addAlojRuta = function(rId,d){
+  _origAR(rId,d);
+  const tb=document.getElementById("aloj-r-"+rId);
+  if(tb) setTimeout(()=>wireAlojRow(tb.lastElementChild),0);
+};
+
+// Patch addR (solo alojamiento tab) to auto-wire
+const _origAddRG = addR;
+addR = function(d){
+  _origAddRG(d);
+  const tb=document.getElementById("tb-r");
+  if(tb) setTimeout(()=>wireAlojRow(tb.lastElementChild),0);
+};
+
+// Patch addResp to wire depto/mun after render
+const _origAddRespG = addResp;
+addResp = function(d){
+  _origAddRespG(d);
+  setTimeout(()=>document.querySelectorAll(".resp-block").forEach(rb=>wireDeptoMun(rb)),60);
+};
+
+function wireAllDeptoMun(){
+  document.querySelectorAll(".resp-block").forEach(rb=>wireDeptoMun(rb));
+  document.querySelectorAll("#tb-r tr,[id^=aloj-r-] tr").forEach(tr=>wireAlojRow(tr));
+}
+
+// ============================================================
+//  REPORTES
+// ============================================================
+const RUBROS_ORDER = ['TRANSPORTE INTERMUNICIPAL','TRANSPORTE URBANO','TRANSPORTE RURAL','ALIMENTACION','HOSPEDAJE','OTROS GASTOS'];
+let rptSortCol = 'pct', rptSortAsc = false;
+
+function sortRpt(col){
+  if(rptSortCol===col) rptSortAsc=!rptSortAsc;
+  else { rptSortCol=col; rptSortAsc=false; }
+  renderReportes();
+}
+
+function fmtCOP(v){ return '$'+(Math.round(v)||0).toLocaleString('es-CO'); }
+function fmtPct(v){ return (v||0).toFixed(1)+'%'; }
+
+function renderReportes(){
+  const filterCC   = document.getElementById('rpt-cc')?.value||'';
+  const filterYear = document.getElementById('rpt-year')?.value||'2026';
+  const filterReg  = document.getElementById('rpt-regional')?.value||'';
+
+  // Update CC selector
+  const ccSel = document.getElementById('rpt-cc');
+  if(ccSel){
+    const ccs = [...new Set(historial.map(h=>h.cc).filter(Boolean))].sort();
+    const cur = ccSel.value;
+    ccSel.innerHTML = '<option value="">Todos los CC</option>' + ccs.map(cc=>`<option${cc===cur?' selected':''}>${cc}</option>`).join('');
+  }
+
+  // Filter historial
+  const items = historial.filter(h=>{
+    if(filterCC && h.cc!==filterCC) return false;
+    if(filterReg && h.regional!==filterReg) return false;
+    return true;
+  });
+
+  // ── KPIs ──
+  const totalEjec = items.reduce((s,h)=>s+h.total,0);
+  const totalAntic = items.length;
+  const munsSet = new Set(items.map(h=>normMun(h.municipio||'')).filter(Boolean));
+
+  // Get total presupuesto for filtered CC
+  let totalPresup = 0;
+  const allCCBudgetData = {};
+  const ccKeys = filterCC
+    ? (ccBudgets[filterCC.replace(/[-_\s]/g,'')]?[filterCC.replace(/[-_\s]/g,'')]:Object.keys(ccBudgets))
+    : Object.keys(ccBudgets);
+  ccKeys.forEach(cc=>{
+    const ydata = ccBudgets[cc]?.[filterYear]||{};
+    Object.values(ydata).forEach(d=>{
+      Object.values(d.rubros||{}).forEach(v=>totalPresup+=v);
+    });
+  });
+
+  const overMuns = [];
+  const munData = buildMunData(items, filterYear, filterCC);
+  munData.forEach(m=>{ if(m.pct>100) overMuns.push(m.municipio); });
+
+  const pctGlobal = totalPresup>0 ? (totalEjec/totalPresup*100) : null;
+  const kpiEl = document.getElementById('rpt-kpis');
+  if(kpiEl) kpiEl.innerHTML = [
+    {label:'Total ejecutado',val:fmtCOP(totalEjec),sub:pctGlobal!=null?fmtPct(pctGlobal)+' del presupuesto total':'Sin presupuesto cargado'},
+    {label:'Presupuesto total',val:fmtCOP(totalPresup),sub:filterYear},
+    {label:'Anticipos generados',val:totalAntic,sub:'solicitudes'},
+    {label:'Municipios en sobrecosto',val:overMuns.length,sub:overMuns.length?overMuns.slice(0,3).join(', ')+(overMuns.length>3?'...':''):'Ninguno',over:overMuns.length>0},
+  ].map(k=>`<div class="kpi">
+    <div class="kpi-label">${k.label}</div>
+    <div class="kpi-val" style="${k.over?'color:#c00':''}">${k.val}</div>
+    <div class="kpi-sub">${k.sub}</div>
+  </div>`).join('');
+
+  // ── RUBROS ──
+  const rubroData = buildRubroData(items, filterYear, filterCC);
+  const rubrosEl = document.getElementById('rpt-rubros');
+  if(rubrosEl){
+    if(!rubroData.length){ rubrosEl.innerHTML='<div class="rpt-empty">Sin datos. Genera anticipos o carga un presupuesto por CC.</div>'; }
+    else {
+      rubrosEl.innerHTML = `<table class="rbt"><thead><tr>
+        <th>Rubro</th><th>Ejecutado</th><th>Presupuesto</th><th style="min-width:220px">% Ejecución</th><th># Anticipos</th>
+      </tr></thead><tbody>`+
+      rubroData.map(r=>{
+        const pct = r.presup>0 ? Math.min(r.ejec/r.presup*100,110) : (r.ejec>0?110:0);
+        const cls = pct>100?'over':pct>80?'warn':'ok';
+        const bar = r.presup>0||r.ejec>0 ? `<div class="prog-wrap">
+          <div class="prog-track"><div class="prog-fill ${cls}" style="width:${Math.min(pct,100)}%"></div></div>
+          <span class="prog-pct ${cls}">${fmtPct(pct)}</span>
+        </div>` : '—';
+        return `<tr>
+          <td style="font-weight:500">${r.rubro}</td>
+          <td>${fmtCOP(r.ejec)}</td>
+          <td style="color:#888">${r.presup>0?fmtCOP(r.presup):'—'}</td>
+          <td>${bar}</td>
+          <td style="color:#888;text-align:center">${r.count}</td>
+        </tr>`;
+      }).join('')+'</tbody></table>';
+    }
+  }
+
+  // ── MUNICIPIOS ──
+  let sorted = [...munData];
+  sorted.sort((a,b)=>{
+    let av=a[rptSortCol]||0, bv=b[rptSortCol]||0;
+    if(typeof av==='string') return rptSortAsc?av.localeCompare(bv):bv.localeCompare(av);
+    return rptSortAsc?av-bv:bv-av;
+  });
+
+  const overBadge = document.getElementById('rpt-over-badge');
+  if(overBadge) overBadge.textContent = overMuns.length ? overMuns.length+' municipio(s) en sobrecosto' : '';
+
+  const munBody = document.getElementById('rpt-mun-body');
+  if(munBody){
+    if(!sorted.length){ munBody.innerHTML='<tr><td colspan="7" class="rpt-empty">Sin datos de municipios</td></tr>'; }
+    else munBody.innerHTML = sorted.map(m=>{
+      const pct = m.presupuesto>0 ? Math.min(m.ejecutado/m.presupuesto*100,110) : (m.ejecutado>0?110:0);
+      const cls = pct>100?'over':pct>80?'warn':'ok';
+      const bar = m.presupuesto>0||m.ejecutado>0 ? `<div class="prog-wrap">
+        <div class="prog-track"><div class="prog-fill ${cls}" style="width:${Math.min(pct,100)}%"></div></div>
+        <span class="prog-pct ${cls}">${fmtPct(pct)}</span>
+      </div>` : '—';
+      const rubroDetail = Object.entries(m.rubros||{}).filter(([,v])=>v.ejec>0).map(([r,v])=>{
+        const rp=v.presup>0?Math.min(v.ejec/v.presup*100,110):0;
+        const rc=rp>100?'over':rp>80?'warn':'ok';
+        return `<span style="font-size:10px;margin-right:6px;white-space:nowrap">
+          <span style="color:#555">${r.replace('TRANSPORTE ','T.')}</span>
+          <span class="prog-pct ${rc}" style="font-size:10px">${fmtPct(rp)}</span>
+        </span>`;
+      }).join('');
+      const estadoBadge = pct>100
+        ? '<span class="badge-over">SOBRECOSTO</span>'
+        : pct>80
+          ? '<span style="font-size:10px;padding:2px 7px;border-radius:4px;background:#fff8e0;color:#b05000;font-weight:600">ALERTA</span>'
+          : '<span class="badge-ok">OK</span>';
+      return `<tr>
+        <td style="font-weight:500">${m.municipio}</td>
+        <td style="font-size:11px;color:#888">${m.cc||'—'}</td>
+        <td style="font-weight:600">${fmtCOP(m.ejecutado)}</td>
+        <td style="color:#888">${m.presupuesto>0?fmtCOP(m.presupuesto):'Sin presup.'}</td>
+        <td>${bar}</td>
+        <td style="max-width:200px">${rubroDetail||'—'}</td>
+        <td>${estadoBadge}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  // ── RESPONSABLES ──
+  const respBody = document.getElementById('rpt-resp-body');
+  if(respBody){
+    if(!items.length){ respBody.innerHTML='<tr><td colspan="8" class="rpt-empty">Sin solicitudes en el historial</td></tr>'; }
+    else respBody.innerHTML = [...items].reverse().map(h=>`<tr>
+      <td style="font-weight:500">${h.nombre||'—'}</td>
+      <td style="color:#888;font-size:11px">${h.cedula||'—'}</td>
+      <td><span style="font-size:11px;padding:2px 8px;background:#f0eff0;border-radius:4px;font-weight:600">${h.cc||'—'}</span></td>
+      <td>${h.municipio||'—'}</td>
+      <td style="font-size:11px;color:#888">${h.regional||'—'}</td>
+      <td style="font-weight:600">${fmtCOP(h.total)}</td>
+      <td style="font-size:11px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${(h.filas||[]).map(f=>f.concepto?.replace('TRANSPORTE ','T.')).join(', ')}</td>
+      <td style="font-size:11px;color:#888">${h.fechaGen||'—'}</td>
+    </tr>`).join('');
+  }
+}
+
+function buildRubroData(items, year, filterCC){
+  // Sum ejecutado per rubro
+  const ejec = {};
+  items.forEach(h=>{
+    (h.filas||[]).forEach(f=>{
+      const c = f.concepto||'OTROS';
+      ejec[c] = (ejec[c]||{ejec:0,count:0});
+      ejec[c].ejec += (f.trayectos||0)*(f.personas||0)*(f.valor_unit||0);
+      ejec[c].count += 1;
+    });
+  });
+  // Get presupuesto per rubro from ccBudgets
+  const presup = {};
+  const ccKey = filterCC ? filterCC.replace(/[-_\s]/g,'') : null;
+  const ccKeys = ccKey&&ccBudgets[ccKey] ? [ccKey] : Object.keys(ccBudgets);
+  ccKeys.forEach(cc=>{
+    const ydata = ccBudgets[cc]?.[year]||{};
+    Object.values(ydata).forEach(d=>{
+      Object.entries(d.rubros||{}).forEach(([rubro,v])=>{
+        presup[rubro] = (presup[rubro]||0) + v;
+      });
+    });
+  });
+  // Combine
+  const all = new Set([...Object.keys(ejec),...Object.keys(presup)]);
+  return [...all].map(r=>({
+    rubro:r, ejec:(ejec[r]?.ejec||0), presup:(presup[r]||0), count:(ejec[r]?.count||0)
+  })).sort((a,b)=>b.ejec-a.ejec);
+}
+
+function buildMunData(items, year, filterCC){
+  // Group by municipio + cc
+  const grouped = {};
+  items.forEach(h=>{
+    const mun = normMun(h.municipio||'');
+    if(!mun) return;
+    const key = mun+'||'+(h.cc||'');
+    if(!grouped[key]) grouped[key]={municipio:h.municipio||mun,cc:h.cc||'',ejecutado:0,rubros:{}};
+    const g=grouped[key];
+    g.ejecutado += h.total;
+    (h.filas||[]).forEach(f=>{
+      const c=f.concepto||'OTROS';
+      if(!g.rubros[c]) g.rubros[c]={ejec:0,presup:0};
+      g.rubros[c].ejec += (f.trayectos||0)*(f.personas||0)*(f.valor_unit||0);
+    });
+  });
+
+  // Add presupuesto per mun from ccBudgets
+  return Object.values(grouped).map(g=>{
+    const mun = normMun(g.municipio);
+    const ccKey = (g.cc||'').replace(/[-_\s]/g,'');
+    const ccKeys = ccKey&&ccBudgets[ccKey] ? [ccKey] : Object.keys(ccBudgets);
+    let totalPresup=0;
+    ccKeys.forEach(cc=>{
+      const ydata = ccBudgets[cc]?.[year]||{};
+      // Find this municipio
+      const found = ydata[mun] || Object.entries(ydata).find(([k])=>k.includes(mun)||(mun.length>=5&&mun.includes(k)))?.[1];
+      if(found){
+        totalPresup += Object.values(found.rubros||{}).reduce((s,v)=>s+v,0);
+        Object.entries(found.rubros||{}).forEach(([r,v])=>{
+          if(!g.rubros[r]) g.rubros[r]={ejec:0,presup:0};
+          g.rubros[r].presup += v;
+        });
+      }
+    });
+    const pct = totalPresup>0?(g.ejecutado/totalPresup*100):0;
+    return {...g, presupuesto:totalPresup, pct, estado:pct>100?'over':pct>80?'warn':'ok'};
   });
 }
 </script>
