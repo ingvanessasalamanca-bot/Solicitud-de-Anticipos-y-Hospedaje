@@ -1642,7 +1642,8 @@ function updateBudget(rId){
 
   let htmlRows = '';
   let totalPresup = 0, totalEjec = 0;
-  const rubros = presupMun.rubros;
+  // Use rubrosTotal (original file totals) for budget comparison if available
+  const rubros = presupMun.rubrosTotal || presupMun.rubros;
 
   // Show all rubros that have presupuesto OR ejecucion
   const allConcepts = new Set([...Object.keys(rubros), ...Object.keys(ejecutado)]);
@@ -1828,52 +1829,82 @@ function sfloat(v){ const f=parseFloat(v); return isNaN(f)?0:f; }
 function parsePresupXlsx(data, cc, year){
   const wb = XLSX.read(data, {type:'array'});
   const results = {};
-  // Try each sheet
   for(const sname of wb.SheetNames){
     const ws = wb.Sheets[sname];
     const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:null});
-    // Find header row (has "Municipio")
     let hdrIdx = rows.findIndex(r=>r&&r.some(v=>v&&String(v).trim()==='Municipio'));
     if(hdrIdx<0) continue;
     const hdr = rows[hdrIdx].map(v=>v?String(v).trim():'');
     const munCol = hdr.indexOf('Municipio');
     if(munCol<0) continue;
-    // Map columns to rubros
+
+    // Find special columns: enc, sup, dias
+    const encCol  = hdr.findIndex(h=>/enctdre/i.test(h));
+    const supCol  = hdr.findIndex(h=>/superv/i.test(h));
+    const diasCol = hdr.findIndex(h=>/dias\s*viaje/i.test(h)||h==='# Dias Viaje');
+
+    // Map columns to rubros (store raw totals)
     const colMap = {};
-    hdr.forEach((h,i)=>{
-      for(const [k,v] of Object.entries(RUBROS_MAP_XLS)){
-        if(h.toLowerCase().includes(k.toLowerCase())) colMap[i]=v;
-      }
-    });
-    // Also handle direct column names
-    const directMap = {
+    const allMaps = {...RUBROS_MAP_XLS,
       'transporte intermunicipal':'TRANSPORTE INTERMUNICIPAL',
       'alimentacion':'ALIMENTACION','alimentación':'ALIMENTACION',
       'hospedaje':'HOSPEDAJE','alojamiento':'HOSPEDAJE',
       'transporte urbano':'TRANSPORTE URBANO',
-      'transporte rural':'TRANSPORTE RURAL',
+      'desplazamiento rural':'TRANSPORTE RURAL','desplaz rural':'TRANSPORTE RURAL',
     };
     hdr.forEach((h,i)=>{
       const hl=h.toLowerCase();
-      for(const [k,v] of Object.entries(directMap)){
-        if(hl.includes(k)) colMap[i]=v;
+      for(const [k,v] of Object.entries(allMaps)){
+        if(hl.includes(k.toLowerCase())){colMap[i]=v;break;}
       }
     });
-    // Parse data rows
+
     for(const row of rows.slice(hdrIdx+1)){
       if(!row||!row[munCol]) continue;
       const mun = normMun(String(row[munCol]));
       if(!mun||mun==='MUNICIPIO'||mun==='TOTAL') continue;
-      const rubros = {};
+
+      const enc  = Math.max(1, sfloat(row[encCol])||1);
+      const sup  = Math.max(0, sfloat(row[supCol])||0);
+      const dias = Math.max(1, sfloat(row[diasCol])||1);
+      const personas = enc + sup;
+
+      const rubrosTotal = {}; // raw totals from file
       for(const [ci,concepto] of Object.entries(colMap)){
         const v = sfloat(row[ci]);
-        if(v>0) rubros[concepto]=(rubros[concepto]||0)+v;
+        if(v>0) rubrosTotal[concepto]=(rubrosTotal[concepto]||0)+v;
       }
+      if(!Object.keys(rubrosTotal).length) continue;
+
+      // Convert totals → unit costs per trayecto/person
+      // Transport: total = tarifa_unit × 2 trayectos × personas
+      // Food:      total = tarifa_unit × dias × personas
+      // Lodging:   total = tarifa_unit × (dias-1) × personas  (noches = dias-1)
+      const rubros = {};
+      Object.entries(rubrosTotal).forEach(([concepto, total])=>{
+        let unit = 0;
+        if(concepto==='TRANSPORTE INTERMUNICIPAL'||concepto==='TRANSPORTE URBANO'||concepto==='TRANSPORTE RURAL'){
+          unit = Math.round(total / (2 * Math.max(1, personas)));
+        } else if(concepto==='ALIMENTACION'){
+          unit = Math.round(total / (Math.max(1,dias) * Math.max(1,personas)));
+        } else if(concepto==='HOSPEDAJE'){
+          const noches = Math.max(1, dias-1);
+          unit = Math.round(total / (noches * Math.max(1,personas)));
+        } else {
+          unit = Math.round(total / Math.max(1,personas));
+        }
+        if(unit>0) rubros[concepto]=unit;
+      });
+
       if(Object.keys(rubros).length>0){
-        results[mun]={rubros, dias:sfloat(row[hdr.indexOf('# Dias Viaje')]||row[hdr.findIndex(h=>h.includes('Dias'))]), enc:sfloat(row[hdr.indexOf('# Enctdres')]||0)};
+        results[mun]={
+          rubros,           // unit costs per trayecto/day/person
+          rubrosTotal,      // original totals for budget comparison
+          dias, enc, sup
+        };
       }
     }
-    if(Object.keys(results).length>0) break; // use first sheet with data
+    if(Object.keys(results).length>0) break;
   }
   return results;
 }
